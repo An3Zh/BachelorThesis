@@ -1,0 +1,22 @@
+# Bytecode and caches
+__pycache__/
+
+# Environment
+.pyenvtf25/
+
+# VS Code settings
+.vscode/
+
+# Data or outputs
+*.csv
+*.h5
+*.ckpt
+*.tfrecord
+general.py
+logs/
+checkpoints/
+\!Archiv/
+\!Trash/
+Data/
+Test1Sample/
+
