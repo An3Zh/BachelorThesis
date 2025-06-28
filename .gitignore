@@ -19,4 +19,6 @@ checkpoints/
 \!Trash/
 Data/
 Test1Sample/
-
+*.pkl
+*.npy
+/stitched_scenes

@@ -1,23 +1,56 @@
-from load import buildDS
-from model import simple
-import matplotlib.pyplot as plt
+from load import buildDS, stitchPatches, getSceneGridSizes
 import tensorflow as tf
-from pathlib import Path
+from tensorflow.keras.models import load_model
+import numpy as np
+from matplotlib import pyplot as plt
+from tqdm import tqdm
+import math
+import time
 
-baseDir          = Path(r"C:\Users\andre\Documents\BA\Dev\Data\38-Cloud_training")
-csvFilenames = Path(r"C:\Users\andre\Documents\BA\Dev\Data\training_patches_38-cloud_nonempty.csv")
-imgSize = (192,192)
-batchSize = 8
+# --- Config ---
+batchSize   = 32
+imgSize     = (192,192)
+modelPath   = r"C:\Users\andre\Documents\BA\Dev\!Archiv\!Models\Simple_savedmodel"
 
-(trainDS, 
- valDS, 
- trainSteps, 
- valSteps) = buildDS(csvFilenames, baseDir, batchSize=batchSize, imgSize=imgSize, seed=42)
+# --- Load Data ---
+(trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
+    includeTestDS=True,
+    batchSize=batchSize,
+    imgSize=imgSize,
+    singleSceneID=0  # 0 for random
+)
 
-modelSimple   = simple(inputShape=(192,192,4))
-historySimple = modelSimple.fit(trainDS, 
-                                validation_data=valDS, 
-                                epochs=3, 
-                                steps_per_epoch=trainSteps, 
-                                validation_steps=valSteps)
-modelSimple.save("Simple_savedmodel", save_format="tf")
+# --- Prepare Inference ---
+sceneGridSizes = getSceneGridSizes()
+if singleSceneID is not None:
+    cols, rows = sceneGridSizes[singleSceneID]
+    total = math.ceil((cols * rows) / batchSize)
+    print(f"🧩 Inference for Scene {singleSceneID} ({cols}×{rows} patches)")
+else:
+    total = math.ceil(9201 / batchSize)
+    print("🧩 Inference for full test set")
+
+# --- Run Inference ---
+model = load_model(modelPath)
+predictions = []
+
+start = time.time()
+for xBatch, _ in tqdm(testDS, total=total):
+    yPred = model(xBatch)  # shape: [B, H, W, 1]
+    predictions.extend([p.numpy() for p in tf.unstack(yPred)])
+print(f"⏱️ Inference completed in {time.time() - start:.2f} seconds")
+
+# --- Prepare Prediction Array ---
+predictionsArray = np.array([np.squeeze(p) for p in predictions])
+np.save("predictions_array.npy", predictionsArray)
+
+# --- Stitch Output ---
+stitchedScenes = stitchPatches(predictionsArray, singleSceneID)
+
+sceneId = singleSceneID  # or manually set it, e.g., 3052
+
+plt.figure(figsize=(12, 12))
+plt.imshow(stitchedScenes[sceneId], cmap="gray")
+plt.title(f"Scene {sceneId}")
+plt.axis('off')
+plt.show()
