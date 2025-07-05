@@ -17,7 +17,7 @@ modelPath   = r"C:\Users\andre\Documents\BA\Dev\!Archiv\!Models\Simple_savedmode
     includeTestDS=True,
     batchSize=batchSize,
     imgSize=imgSize,
-    singleSceneID=0  # 0 for random
+    singleSceneID=None  # 0 for random
 )
 
 # --- Prepare Inference ---

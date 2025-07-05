@@ -1,0 +1,40 @@
+\documentclass[12pt,a4paper]{report}
+
+% Language
+\usepackage[english]{babel} % or [english] depending on your thesis language
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Page layout
+\usepackage[a4paper, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm]{geometry}
+
+% Essential packages
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{setspace}
+\usepackage{csquotes}
+\usepackage[backend=biber, style=numeric]{biblatex}
+\addbibresource{bibliography.bib}
+\setstretch{1.2} % Optional, for slight line spacing
+
+% Font: use default Latin Modern – nothing else needed
+
+% No page numbers on title page
+\pagestyle{plain}
+
+\begin{document}
+
+% Include title
+\input{sections/auxiliar/title.tex}
+\input{sections/auxiliar/legal.tex}
+\input{sections/abstract.tex}
+
+% Optional start of thesis content
+\clearpage
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+\printbibliography
+\end{document}

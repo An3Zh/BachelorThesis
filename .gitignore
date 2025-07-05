@@ -2,23 +2,33 @@
 __pycache__/
 
 # Environment
-.pyenvtf25/
-
-# VS Code settings
-.vscode/
+dev/.pyenvtf25/
 
 # Data or outputs
 *.csv
 *.h5
 *.ckpt
 *.tfrecord
-general.py
+dev/general.py
 logs/
 checkpoints/
-\!Archiv/
-\!Trash/
-Data/
-Test1Sample/
+dev/!Archiv/
+dev/!Trash/
+dev/Data/
+dev/Test1Sample/
 *.pkl
 *.npy
-/stitched_scenes
+dev/stitched_scenes
+
+
+# Personal files
+.stuff/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.bbl
+*.blg
+thesis/build/
