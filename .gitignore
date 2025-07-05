@@ -31,4 +31,5 @@ dev/stitched_scenes
 *.synctex.gz
 *.bbl
 *.blg
+*.pdf
 thesis/build/
