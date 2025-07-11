@@ -17,6 +17,7 @@
 \usepackage{csquotes}
 \usepackage{newtxtext,newtxmath}  % Times-like text and math
 \usepackage[backend=biber, style=numeric]{biblatex}
+\usepackage{float}
 \addbibresource{bibliography.bib}
 \setstretch{1.2} % Optional, for slight line spacing
 
@@ -31,9 +32,11 @@
 \include{sections/auxiliar/title.tex}
 \include{sections/auxiliar/legal.tex}
 \include{sections/abstract.tex}
-\include{sections/introduction.tex}
 
 \tableofcontents
+
+\include{sections/introduction.tex}
+\include{sections/background.tex}
 
 % Optional start of thesis content
 \clearpage
