@@ -16,8 +16,11 @@
 \usepackage{setspace}
 \usepackage{csquotes}
 \usepackage{newtxtext,newtxmath}  % Times-like text and math
-\usepackage[backend=biber, style=numeric]{biblatex}
+\usepackage[backend=biber, style=numeric, url=true]{biblatex}
 \usepackage{float}
+\setlength{\marginparwidth}{2cm}
+\usepackage{todonotes}
+\setuptodonotes{inline}
 \addbibresource{bibliography.bib}
 \setstretch{1.2} % Optional, for slight line spacing
 
@@ -27,6 +30,7 @@
 \pagestyle{plain}
 
 \begin{document}
+\sloppy
 
 % Include title
 \include{sections/auxiliar/title.tex}
@@ -37,6 +41,10 @@
 
 \include{sections/introduction.tex}
 \include{sections/background.tex}
+\include{sections/concept.tex}
+\include{sections/implementation.tex}
+\include{sections/evaluation.tex}
+\include{sections/conclusions.tex}
 
 % Optional start of thesis content
 \clearpage

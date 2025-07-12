@@ -1,0 +1,50 @@
+{
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+
+\section{Implementation}
+\subsection{Dataset loading pipeline}
+
+As mentioned in section 2.3, the dataset is split into 18 training and 20 test images. Each full scene is stored as a 16-bit unsigned integer .TIF file with four channels: RGB and NIR. \todo{ maybe add spectral range in nm} These images have a resolution of around 8000x8000 pixels and a size of approximately 130 MB. To reduce memory load and optimize training, validation and testing performance, the dataset is preprocessed by cropping each scene into smaller patches of 384x384 pixels.
+
+Unlike typical RGB images used in computer vision, the channels are not combined. Instead, each channel is stored in its respective directory for both training and testing subsets. For visualization purposes, the full scene images are rendered using a standard false-color composite in which the NIR band is mapped to red, red to green, and green to blue. This mapping coresponds to the commonly used Color Infrared (CIR) visualization in remote sensing. CIR imagery enhances features such as vegetation and clouds, which exhibit distinct reflectance patterns across the visible and NIR spectrum.
+
+However, these false-color visualizations were not used as input for the CNN during training, validation, or inference. They served solely as visual references for qualitative insprection by the human observer.
+
+\todo{check patches and scenes to verify what bands were replaced}
+\todo{provide 1 scene false color image and rgb nir gt patches as example images}
+
+The following folder structure of the dataset was used:
+
+\todo{provide folder structure}
+
+Additionally .csv files containing lists of patch filenames and corresponding scene IDs were provided and leveraged for efficient dataset construction using TensorFlow data pipeline utilites.
+
+One notable detail is that, due to the cropping and padding of border patches (in order to achieve standard patch size 384x384) and the tilted geometry of Landsat 8 imagery, some resulting patches contain no meaningful information – appearing completelly black across all four channels. These empty patches were excluded from training and validation to avoid introducing noise or misleading the model.
+
+\subsubsection{Train and validation subsets}
+
+To build a training and validation pipeline, the function BuildDS was implemented along with several supporting helper functions, all included in the load.py file. Later on, the function was extended to optionally load the test dataset as well – this will be discussed separately in !!!Test subset!!!
+
+For efficient data handling and memory management, built-in TensorFlow utilities (referred to as tf in the following text and code) were used. Specifically, tf.Data.TextLineDataset() was used to read the .csv file line by line – each line representing the filename of a patch – which served as the foundation for the dataset pipeline.
+
+The complete training subset originally contains 8400 patches. However, as noted earlier in !!!chapter!!!, only 5155 of them actually contain valid data and are therefore used for training and validation. The dataset is shuffled and then split into training and validation subsets. The ration between the two can be configured as needed.
+
+Using the .map methon, each text line is first expanded into five full paths: the corresponding red, green, blue, NIR and ground truth patch filenames. Each of these file paths is then replaced by ist actual image content, loaded as tensor. This transformation is implemented in the helper function loadDS, which itself calls another utility, loadTIF. At this stage, each dataset element is a tuple of TensorFlow tensors representing the input image and its corresponding ground truth.
+
+The loadDS together with loadTIF function are loading each .TIF image and performing the necessary conversions:
+
+\begin{itemize}
+    \item RGB and NIR patches, originally stored as 16-bit unsigned integers (range 0 - 65535), are cast to float32 and normalized to the range 0-1
+    \item Ground truth masks, which originally contain values of either 0 or 255 (as uint8), are binarizes to values of 0 and 1, and also cast to float32
+\end{itemize}
+
+An additional feature of the loadDS function allows optional resizing (downsampling) of the input images, if a target image size is provided. Importantly, the image loading and transormation pipeline ensures no information loss up to the point of resizing, where a reduction in resolution is intentional and controlled.
+
+As final preparation steps, the dataset is: shuffled, batched, prefetched, and set to repeat indefinitely (cycled).
+
+\todo{handle all references and formattings}
+\todo{maybe add code snippets}
+
+}

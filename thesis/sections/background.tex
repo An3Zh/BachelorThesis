@@ -28,10 +28,13 @@ Running machine learning inference on embedded systems is referred to as edge in
 
 The Edge TPU delivers up to 4 trillion operations per second (TOPS) of performance while consuming only around 2 watts of power, making it ideal for use in resource-constrained environments such as satellites, where energy efficiency and reliability are crucial.
 
-To deploy a model on Edge TPU, it must be:
+To deploy a model on Edge TPU, it must meet the following requirements:
 \begin{itemize}
-    \item Converted into the TensorFlow Lite (.tflite) format,
-    \item And fully quantized to 8-bit integers.
+    \item Tensor parameters quantized
+    \item Tensor sizes are constant at compile-time
+    \item Model parameters (such as bias tensors) are constant at compile-time
+    \item Tensors are either 1-, 2-, or 3-dimensional. If a tensor has more than 3 dimensions, then only the 3 innermost dimensions may have a size greater than 1.
+    \item The model uses only the operations supported by the Edge TPU (see table 1 below). \todo{CROP the table to only relevant commands and paste it}
 \end{itemize}
 
 These requirements directly affect model architecture, training strategy, and tooling. For instance, certain operations unsopported by Edge TPU must be avoided, and quantization aware training or post-training quantization must be considered early in the development process.
