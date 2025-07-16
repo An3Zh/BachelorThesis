@@ -2,14 +2,14 @@
 __pycache__/
 
 # Environment
-dev/.pyenvtf25/
+dev/.venv/
 
 # Data or outputs
 *.csv
 *.h5
 *.ckpt
 *.tfrecord
-dev/general.py
+dev/legacy.py
 logs/
 checkpoints/
 dev/!Archiv/
@@ -19,6 +19,9 @@ dev/Test1Sample/
 *.pkl
 *.npy
 dev/stitched_scenes
+*.tflite
+*.png
+*.txt
 
 
 # Personal files

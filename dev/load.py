@@ -81,7 +81,7 @@ def loadDS(
     x = tf.stack([r, g, b, n], axis=-1)                     # [H,W,4], uint16
     x = tf.cast(x, tf.float32) / 65535.0                    # [0,1] float32
     if imgSize is not None:
-        x = tf.image.resize(x, imgSize)                     # [192,192,4]
+        x = tf.image.resize(x, imgSize, method='bilinear')                     # [192,192,4]
 
     if gt is not None:
         gt = loadTIF(gt)
@@ -144,7 +144,6 @@ def buildDS(
     valDS = valDS.batch(batchSize).prefetch(tf.data.AUTOTUNE)
 
     # Similarly create test dataset
-    testDS = None
     if includeTestDS is True:
         if singleSceneID is not None:
             if singleSceneID == 0:
@@ -164,6 +163,9 @@ def buildDS(
         testDS = testDS.map(testPathsFn, num_parallel_calls=tf.data.AUTOTUNE)
         testDS = testDS.map(testLoadFn, num_parallel_calls=tf.data.AUTOTUNE)
         testDS = testDS.batch(batchSize).prefetch(tf.data.AUTOTUNE)
+    else:
+        testDS = None
+        singleSceneID = None
 
     return trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID
     
