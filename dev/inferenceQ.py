@@ -6,21 +6,19 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 import math
 import time
-from tensorflow_model_optimization.quantization.keras import quantize_scope
-from model import softJaccardLoss
 
 
 
 # --- Config ---
-batchSize   = 1
-imgSize     = (384,384)
-singleSceneID=29044
+batchSize     = 1
+imgSize       = (192,192)
+singleSceneID = 29044
 
 # --- Load Data ---
 (trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
     includeTestDS=True,
     batchSize=batchSize,
-    imgSize=None,
+    imgSize=imgSize,
     singleSceneID=singleSceneID  # 0 for random
 )
 
@@ -34,27 +32,49 @@ else:
     total = math.ceil(9201 / batchSize)
     print("🧩 Inference for full test set")
 
-# --- Run Inference ---
+# --- Load TFLite Model ---
 
+tfliteModelPath = "dev/model192epochs1/quant.tflite"
+interpreter = tf.lite.Interpreter(model_path=tfliteModelPath)
+interpreter.allocate_tensors()
+inputDetails = interpreter.get_input_details()
+outputDetails = interpreter.get_output_details()
 
-model = tf.keras.models.load_model('best_model.h5')
 
 predictions = []
 
 start = time.time()
+
+
 for xBatch, _ in tqdm(testDS, total=total):
-    yPred = model(xBatch)  # shape: [B, H, W, 1]
-    predictions.extend([p.numpy() for p in tf.unstack(yPred)])
+    inputArray = xBatch.numpy() if tf.is_tensor(xBatch) else xBatch
+
+    scale, zeroPoint = inputDetails[0]['quantization']
+    quantizedInput = np.round(inputArray / scale + zeroPoint).astype(np.int8)
+
+    print('putThatIn')
+    interpreter.set_tensor(inputDetails[0]['index'], quantizedInput)
+    print('putThatIN')
+    interpreter.invoke()
+    print('putThatOut')
+    outputData = interpreter.get_tensor(outputDetails[0]['index'])
+    print('putThatOUT')
+    outScale, outZeroPoint = outputDetails[0]['quantization']
+    outputDequant = (outputData.astype(np.float32) - outZeroPoint) * outScale
+    # Save as probabilities, squeeze if needed
+    for p in outputDequant:
+        predictions.append(np.squeeze(p))
+
+
 print(f"⏱️ Inference completed in {time.time() - start:.2f} seconds")
 
 # --- Prepare Prediction Array ---
-predictionsArray = np.array([np.squeeze(p) for p in predictions])
-#np.save("predictions_array.npy", predictionsArray)
+predictionsArray = np.array(predictions)
 
 # --- Stitch Output ---
 stitchedScenes = stitchPatches(predictionsArray, singleSceneID)
 
-sceneId = singleSceneID  # or manually set it, e.g., 3052
+sceneId = singleSceneID
 
 plt.figure(figsize=(12, 12))
 plt.imshow(stitchedScenes[sceneId], cmap="gray")

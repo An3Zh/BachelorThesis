@@ -6,8 +6,7 @@ from load import buildDS
 
 
 
-def representativeDatasetGen():
-    imgSize = (192, 192)
+def representativeDatasetGen(imgSize):
     batchSize = 1       
 
     trainDS, _, _, _, _, _ = buildDS(includeTestDS=False, batchSize=batchSize, imgSize=imgSize)
@@ -17,11 +16,16 @@ def representativeDatasetGen():
         i+=1
         yield [xBatch]
 
-def ConvertToTflite(model):
+def asBatchOne(model, modelArchitecture, imgSize):
+    modelBatchOne = modelArchitecture(batchShape=(1, *imgSize, 4))
+    modelBatchOne.set_weights(model.get_weights())
+    return modelBatchOne
+
+def ConvertToTflite(model, imgSize):
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.representative_dataset = representativeDatasetGen
+    converter.representative_dataset = representativeDatasetGen(imgSize)
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     converter.inference_input_type = tf.int8
     converter.inference_output_type = tf.int8
@@ -31,7 +35,7 @@ def ConvertToTflite(model):
     print("saved converted model")
     return tfliteModel
 
-def convertToEdge(model):
+def convertToEdge():
     command = [
         "wsl", "edgetpu_compiler",
         "dev/quant.tflite", "-o",
