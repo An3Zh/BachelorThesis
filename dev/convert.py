@@ -12,7 +12,7 @@ def representativeDatasetGen(imgSize):
 
     trainDS, _, _, _, _, _ = buildDS(includeTestDS=False, batchSize=batchSize, imgSize=imgSize)
     i = 0
-    for xBatch, _ in trainDS.take(1):  # You can increase this if needed
+    for xBatch, _ in trainDS.take(20):  # You can increase this if needed
         print(f"Calibration batch {i}")
         i+=1
         yield [xBatch]

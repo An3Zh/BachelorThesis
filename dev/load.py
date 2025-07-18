@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Tuple, Optional, Union
 import random
 import json
+from matplotlib import pyplot as plt
+import os
 
 def getFolders(baseDir: Path) -> Tuple[Dict[str, Path], Dict[str, Path]]:
     trainFolders = {
@@ -227,7 +229,7 @@ def stitchPatches(yPred: np.ndarray, singleSceneID: int = None):
 
 if __name__ == "__main__":
 
-    batchSize = 1
+    batchSize = 2
     imgSize = (192,192)
 
     (trainDS, 
@@ -237,4 +239,52 @@ if __name__ == "__main__":
      testDS, singleSceneID) = buildDS(includeTestDS=True, batchSize=batchSize, imgSize=imgSize, singleSceneID=3052)
 
 
+    os.makedirs("train_vis", exist_ok=True)
+    os.makedirs("val_vis", exist_ok=True)
 
+    # --- Training batch ---
+    for xb, mb in trainDS.take(1):
+        print("\n--- Training Batch ---")
+        print(f"x batch: {xb.shape}, {xb.dtype}, min={tf.reduce_min(xb).numpy()}, max={tf.reduce_max(xb).numpy()}")
+        print(f"m batch: {mb.shape}, {mb.dtype}, unique={tf.unique(tf.reshape(mb, [-1])).y.numpy()}")
+
+        for i in range(xb.shape[0]):
+            fig, axs = plt.subplots(1, 5, figsize=(15, 4))
+            axs[0].imshow(xb[i, :, :, 0], cmap='Reds')
+            axs[0].set_title("Red")
+            axs[1].imshow(xb[i, :, :, 1], cmap='Greens')
+            axs[1].set_title("Green")
+            axs[2].imshow(xb[i, :, :, 2], cmap='Blues')
+            axs[2].set_title("Blue")
+            axs[3].imshow(xb[i, :, :, 3], cmap='gray')
+            axs[3].set_title("NIR")
+            axs[4].imshow(mb[i], cmap='gray', vmin=0, vmax=1)
+            axs[4].set_title("Mask")
+            for ax in axs:
+                ax.axis('off')
+            plt.tight_layout()
+            plt.savefig(f"train_vis/train_batch_0_sample_{i}.png")
+            plt.close(fig)
+
+    # --- Validation batch ---
+    for xb, mb in valDS.take(1):
+        print("\n--- Validation Batch ---")
+        print(f"x batch: {xb.shape}, {xb.dtype}, min={tf.reduce_min(xb).numpy()}, max={tf.reduce_max(xb).numpy()}")
+        print(f"m batch: {mb.shape}, {mb.dtype}, unique={tf.unique(tf.reshape(mb, [-1])).y.numpy()}")
+        for i in range(xb.shape[0]):
+            fig, axs = plt.subplots(1, 5, figsize=(15, 4))
+            axs[0].imshow(xb[i, :, :, 0], cmap='Reds')
+            axs[0].set_title("Red")
+            axs[1].imshow(xb[i, :, :, 1], cmap='Greens')
+            axs[1].set_title("Green")
+            axs[2].imshow(xb[i, :, :, 2], cmap='Blues')
+            axs[2].set_title("Blue")
+            axs[3].imshow(xb[i, :, :, 3], cmap='gray')
+            axs[3].set_title("NIR")
+            axs[4].imshow(mb[i], cmap='gray', vmin=0, vmax=1)
+            axs[4].set_title("Mask")
+            for ax in axs:
+                ax.axis('off')
+            plt.tight_layout()
+            plt.savefig(f"val_vis/val_batch_0_sample_{i}.png")
+            plt.close(fig)

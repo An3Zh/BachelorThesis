@@ -5,6 +5,7 @@ import tensorflow_model_optimization as tfmot
 quantize_annotate_layer = tfmot.quantization.keras.quantize_annotate_layer
 quantize_apply          = tfmot.quantization.keras.quantize_apply
 from tensorflow.keras.utils import plot_model
+from tensorflow.keras.metrics import MeanIoU, Precision, Recall
 
 def softJaccardLoss(yTrue, yPred, epsilon=1e-9):
     yTrue = tf.cast(yTrue, tf.float32)
@@ -102,7 +103,7 @@ def BIGuNetQ(batchShape, filters=32):
 
     model = Model(inputs, outputs)
     model = quantize_apply(model)
-    model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient])
+    model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', MeanIoU(num_classes=2), diceCoefficient, Precision, Recall])
 
     return model
 
@@ -147,7 +148,7 @@ def uNetQ(batchShape, filters=32):
 
     model = Model(inputs, outputs)
     model = quantize_apply(model)
-    model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient])
 
     return model
 

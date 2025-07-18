@@ -8,12 +8,12 @@ import json
 import os
 
 
-batchSize         = 1
+batchSize         = 4
 imgSize           = (192,192)
-numEpochs         = 1
+numEpochs         = 10
 modelArchitecture = uNetQ
-valRatio          = 0.1 
-trainValDSSize    = 10
+valRatio          = 0.2 
+trainValDSSize    = 5155
 
 (trainDS, valDS, trainSteps, 
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
@@ -60,6 +60,9 @@ model.save(f'{runFolder}/endModel.h5')
 print('-' * 40)
 print ('Training end, model saved successfully!')
 print('-' * 40)
+
+with open(f'{runFolder}/training_history.json', "w") as f:
+    json.dump(historyuNet.history, f, indent=4, defaults=str)
 
 model = asBatchOne(model, modelArchitecture, imgSize)
 model = ConvertToTflite(model, runFolder, imgSize)
