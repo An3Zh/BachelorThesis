@@ -4,6 +4,7 @@ from tensorflow.keras.models import Model
 import tensorflow_model_optimization as tfmot
 quantize_annotate_layer = tfmot.quantization.keras.quantize_annotate_layer
 quantize_apply          = tfmot.quantization.keras.quantize_apply
+from tensorflow.keras.utils import plot_model
 
 def softJaccardLoss(yTrue, yPred, epsilon=1e-9):
     yTrue = tf.cast(yTrue, tf.float32)
@@ -43,7 +44,7 @@ def quantConvBlock(x, filters, kernelSize=3, activation='relu', name=None):
     x = Activation(activation, name=f"{name}_act2" if name else None)(x)
     return x
 
-def uNetQ(batchShape, filters=32):
+def BIGuNetQ(batchShape, filters=32):
     inputs = Input(batch_shape=batchShape)
 
     # Encoder (6 blocks)
@@ -105,6 +106,57 @@ def uNetQ(batchShape, filters=32):
 
     return model
 
+def uNetQ(batchShape, filters=32):
+    inputs = Input(batch_shape=batchShape)
+
+    # Encoder (3 blocks)
+    c1 = quantConvBlock(inputs, filters, name="enc1")
+    p1 = MaxPooling2D((2, 2), name="pool1")(c1)
+
+    c2 = quantConvBlock(p1, filters*2, name="enc2")
+    p2 = MaxPooling2D((2, 2), name="pool2")(c2)
+
+    c3 = quantConvBlock(p2, filters*4, name="enc3")
+    p3 = MaxPooling2D((2, 2), name="pool3")(c3)
+
+    c6 = quantConvBlock(p3, filters*8, name="bottleneck")  # 4th (bottleneck)
+
+    # Decoder (mirrored, 3 up blocks)
+
+    u3 = quantize_annotate_layer(
+        Conv2DTranspose(filters*4, (2, 2), strides=(2, 2), padding='same', name="up3")
+    )(c6)
+    u3 = Concatenate(name="concat3")([u3, c3])
+    d3 = quantConvBlock(u3, filters*4, name="dec3")
+
+    u2 = quantize_annotate_layer(
+        Conv2DTranspose(filters*2, (2, 2), strides=(2, 2), padding='same', name="up2")
+    )(d3)
+    u2 = Concatenate(name="concat2")([u2, c2])
+    d2 = quantConvBlock(u2, filters*2, name="dec2")
+
+    u1 = quantize_annotate_layer(
+        Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same', name="up1")
+    )(d2)
+    u1 = Concatenate(name="concat1")([u1, c1])
+    d1 = quantConvBlock(u1, filters, name="dec1")
+
+    outputs = quantize_annotate_layer(
+        Conv2D(1, (1, 1), activation='sigmoid', name="output")
+    )(d1)
+
+    model = Model(inputs, outputs)
+    model = quantize_apply(model)
+    model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient])
+
+    return model
+
 # Example usage
 if __name__ == "__main__":
+
+    modelArchFolder = f"dev"
+
     model = uNetQ(batchShape=(4, 384, 384, 4))
+    model.summary()
+    plot_model(model, to_file=f'{modelArchFolder}/model.pdf', show_shapes=True, show_layer_names=True)
+    print('Model plotted and saved!')
