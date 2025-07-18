@@ -22,6 +22,8 @@ dev/stitched_scenes
 *.tflite
 *.png
 *.txt
+dev/config.json
+dev/results
 
 
 # Personal files

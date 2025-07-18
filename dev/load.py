@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Tuple, Optional, Union
 import random
+import json
 
 def getFolders(baseDir: Path) -> Tuple[Dict[str, Path], Dict[str, Path]]:
     trainFolders = {
@@ -108,9 +109,18 @@ def buildDS(
     Tuple[tf.data.Dataset, tf.data.Dataset, int, int, tf.data.Dataset, int]
 ]:
     
-    baseDir     = Path(r"C:\Users\andre\Documents\BA\Dev\Data")
-    csvTrainVal = Path(r"C:\Users\andre\Documents\BA\Dev\Data\training_patches_38-cloud_nonempty.csv")
-    csvTest     = Path(r"C:\Users\andre\Documents\BA\Dev\Data\!myCSVs\fullTestDS.csv")
+
+    # Load config from config.json (if present)
+    configPath = Path(__file__).parent / "config.json"
+    if configPath.exists():
+        with open(configPath, "r") as f:
+            config = json.load(f)
+    else:
+        raise ValueError("couldn't find config.json")
+
+    baseDir      = Path(config["baseDir"])
+    csvTrainVal  = Path(config["csvTrainVal"])
+    csvTest      = Path(config["csvTest"])
 
     trainFolders, testFolders = getFolders(baseDir)
 

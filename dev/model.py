@@ -1,7 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, Conv2DTranspose, Concatenate, BatchNormalization, Activation
 from tensorflow.keras.models import Model
-from tensorflow.keras.utils import plot_model
 import tensorflow_model_optimization as tfmot
 quantize_annotate_layer = tfmot.quantization.keras.quantize_annotate_layer
 quantize_apply          = tfmot.quantization.keras.quantize_apply
@@ -103,9 +102,6 @@ def uNetQ(batchShape, filters=32):
     model = Model(inputs, outputs)
     model = quantize_apply(model)
     model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient])
-    model.summary()
-
-    plot_model(model, to_file="dev/model.pdf", show_shapes=True, show_layer_names=True)
 
     return model
 
