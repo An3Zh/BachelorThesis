@@ -62,7 +62,7 @@ print ('Training end, model saved successfully!')
 print('-' * 40)
 
 with open(f'{runFolder}/training_history.json', "w") as f:
-    json.dump(historyuNet.history, f, indent=4, defaults=str)
+    json.dump(historyuNet.history, f, indent=4, default=str)
 
 model = asBatchOne(model, modelArchitecture, imgSize)
 model = ConvertToTflite(model, runFolder, imgSize)
