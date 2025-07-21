@@ -38,7 +38,7 @@ def ConvertToTflite(model, runFolder, imgSize):
     print('-' * 40)
     return tfliteModel
 
-def to_wsl_path(path):
+def toWslPath(path):
     abs_path = os.path.abspath(path)
     drive, rest = abs_path[0], abs_path[2:]
     return f"/mnt/{drive.lower()}{rest.replace(os.sep, '/')}"
@@ -50,8 +50,8 @@ def convertToEdge(runFolder):
     
     if system_type == "windows":
         # Use WSL and convert paths
-        tflite_path = to_wsl_path(tflite_path)
-        output_dir = to_wsl_path(output_dir)
+        tflite_path = toWslPath(tflite_path)
+        output_dir = toWslPath(output_dir)
         command = [
             "wsl", "edgetpu_compiler",
             tflite_path, "-o", output_dir
