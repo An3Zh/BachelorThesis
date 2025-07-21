@@ -58,4 +58,4 @@ clean:
 	rm -f $(TARGET)
 
 run: $(TARGET)
-	./build/inference /home/mendel/BA/dev/shared/patches /home/mendel/BA/dev/shared/results
+	./build/inference
