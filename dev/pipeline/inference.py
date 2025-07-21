@@ -37,7 +37,7 @@ else:
 
 # --- Run Inference ---
 
-tfModelPath = r"C:\Users\andre\Documents\BA\dev\main\results\runs\run_20250719_170647\endModel.h5"
+tfModelPath = r"C:\Users\andre\Documents\BA\dev\pipeline\results\runs\run_20250719_170647\endModel.h5"
 
 with quantize_scope():
     model = tf.keras.models.load_model(

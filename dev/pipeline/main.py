@@ -8,13 +8,13 @@ import json
 import os
 
 
-batchSize         = 4
+batchSize         = 8
 imgSize           = (192,192)
-numEpochs         = 10
+numEpochs         = 2
 modelArchitecture = uNetQ
 valRatio          = 0.1 
-trainValDSSize    = 10
-numCalBatches     = 1
+trainValDSSize    = 5155
+numCalBatches     = 40
 
 (trainDS, valDS, trainSteps, 
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
@@ -24,9 +24,9 @@ model   = modelArchitecture(batchShape=(batchSize, *imgSize, 4))
 model.summary()
 
 now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-runFolder = f"dev/main/results/runs/run_{now}"
+runFolder = f"dev/pipeline/results/runs/run_{now}"
 os.makedirs(runFolder, exist_ok=True)
-shutil.copy('dev/main/model.py', f'{runFolder}/my_model.py')
+shutil.copy('dev/pipeline/model.py', f'{runFolder}/my_model.py')
 plot_model(model, to_file=f'{runFolder}/model.pdf', show_shapes=True, show_layer_names=True)
 
 checkpoint = ModelCheckpoint(f'{runFolder}/modelCheckpoint.h5', monitor='val_loss', save_best_only=True, verbose=1)
@@ -55,7 +55,7 @@ with open(f'{runFolder}/model_architecture.json', "w") as f:
     f.write(model.to_json())
 
 historyuNet = model.fit(trainDS, validation_data=valDS, epochs=numEpochs, callbacks=[checkpoint, earlyStop, lrReduce], 
-                        steps_per_epoch=trainSteps, validation_steps=valSteps)
+                        steps_per_epoch=trainSteps, validation_steps=valSteps, validation_freq=5)
 
 model.save(f'{runFolder}/endModel.h5')
 print('-' * 40)
