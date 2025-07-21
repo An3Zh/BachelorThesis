@@ -14,6 +14,7 @@ numEpochs         = 1
 modelArchitecture = uNetQ
 valRatio          = 0.1 
 trainValDSSize    = 10
+numCalBatches     = 1
 
 (trainDS, valDS, trainSteps, 
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
@@ -23,9 +24,9 @@ model   = modelArchitecture(batchShape=(batchSize, *imgSize, 4))
 model.summary()
 
 now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-runFolder = f"dev/results/run_{now}"
+runFolder = f"dev/main/results/runs/run_{now}"
 os.makedirs(runFolder, exist_ok=True)
-shutil.copy('dev/model.py', f'{runFolder}/my_model.py')
+shutil.copy('dev/main/model.py', f'{runFolder}/my_model.py')
 plot_model(model, to_file=f'{runFolder}/model.pdf', show_shapes=True, show_layer_names=True)
 
 checkpoint = ModelCheckpoint(f'{runFolder}/modelCheckpoint.h5', monitor='val_loss', save_best_only=True, verbose=1)
@@ -62,5 +63,5 @@ print ('Training end, model saved successfully!')
 print('-' * 40)
 
 model = asBatchOne(model, modelArchitecture, imgSize)
-model = ConvertToTflite(model, runFolder, imgSize)
+model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)
 convertToEdge(runFolder)
