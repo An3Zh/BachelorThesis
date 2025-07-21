@@ -38,3 +38,15 @@ dev/results
 *.blg
 *.pdf
 thesis/build/
+
+.vscode
+.Archiv
+shared
+*.bin
+include
+lib
+python
+build
+edgetpu_results
+scripts
+testdata
