@@ -47,3 +47,6 @@ include
 lib
 python
 build
+edgetpu_results
+scripts
+testdata
