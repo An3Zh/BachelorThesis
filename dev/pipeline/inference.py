@@ -6,21 +6,22 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 import math
 import time
+from tensorflow_model_optimization.python.core.quantization.keras.quantize_wrapper import QuantizeWrapper
 from tensorflow_model_optimization.quantization.keras import quantize_scope
-from model import softJaccardLoss
+from model import softJaccardLoss, diceCoefficient
 
 
 
 # --- Config ---
-batchSize   = 1
-imgSize     = (384,384)
-singleSceneID=29044
+batchSize     = 1
+imgSize       = (192,192)
+singleSceneID = 0
 
 # --- Load Data ---
 (trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
     includeTestDS=True,
     batchSize=batchSize,
-    imgSize=None,
+    imgSize=imgSize,
     singleSceneID=singleSceneID  # 0 for random
 )
 
@@ -36,8 +37,14 @@ else:
 
 # --- Run Inference ---
 
+tfModelPath = r"C:\Users\andre\Documents\BA\dev\main\results\runs\run_20250719_170647\endModel.h5"
 
-model = tf.keras.models.load_model('best_model.h5')
+with quantize_scope():
+    model = tf.keras.models.load_model(
+        tfModelPath,
+        custom_objects={'softJaccardLoss': softJaccardLoss,
+                        'diceCoefficient': diceCoefficient}
+    )
 
 predictions = []
 

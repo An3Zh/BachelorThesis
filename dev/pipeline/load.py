@@ -183,7 +183,7 @@ def buildDS(
     
 def stitchPatches(yPred: np.ndarray, singleSceneID: int = None):
 
-    outputDir = Path(r"C:\Users\andre\Documents\BA\Dev\stitched_scenes")
+    outputDir = Path(r"C:\Users\andre\Documents\BA\dev\main\results\scenes")
     outputDir.mkdir(parents=True, exist_ok=True)
     sceneGridSizes = getSceneGridSizes()
     scenesToProcess = (

@@ -34,7 +34,7 @@ else:
 
 # --- Load TFLite Model ---
 
-tfliteModelPath = "dev/model192epochs1/quant.tflite"
+tfliteModelPath = r"C:\Users\andre\Documents\BA\dev\results\run_20250718_113934\quant.tflite"
 interpreter = tf.lite.Interpreter(model_path=tfliteModelPath)
 interpreter.allocate_tensors()
 inputDetails = interpreter.get_input_details()

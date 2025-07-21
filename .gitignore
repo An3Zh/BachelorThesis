@@ -14,7 +14,7 @@ logs/
 checkpoints/
 dev/!Archiv/
 dev/!Trash/
-dev/Data/
+dev/pipeline/Data/
 dev/Test1Sample/
 *.pkl
 *.npy
@@ -22,8 +22,10 @@ dev/stitched_scenes
 *.tflite
 *.png
 *.txt
-dev/config.json
-dev/results
+dev/pipeline/config.json
+results
+scenes
+.archive
 
 
 # Personal files
@@ -38,3 +40,16 @@ dev/results
 *.blg
 *.pdf
 thesis/build/
+
+.vscode
+.Archiv
+shared
+*.bin
+include
+lib
+python
+build
+edgetpu_results
+scripts
+testdata
+
