@@ -7,12 +7,12 @@ import platform
 
 
 
-def representativeDatasetGen(imgSize):
+def representativeDatasetGen(imgSize, numCalBatches):
     batchSize = 1       
 
     trainDS, _, _, _, _, _ = buildDS(includeTestDS=False, batchSize=batchSize, imgSize=imgSize)
     i = 0
-    for xBatch, _ in trainDS.take(1):  # You can increase this if needed
+    for xBatch, _ in trainDS.take(numCalBatches):  # You can increase this if needed
         print(f"Calibration batch {i}")
         i+=1
         yield [xBatch]
@@ -22,11 +22,11 @@ def asBatchOne(model, modelArchitecture, imgSize):
     modelBatchOne.set_weights(model.get_weights())
     return modelBatchOne
 
-def ConvertToTflite(model, runFolder, imgSize):
+def ConvertToTflite(model, runFolder, imgSize, numCalBatches):
 
     converter = tf.lite.TFLiteConverter.from_keras_model(model)
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.representative_dataset = lambda: representativeDatasetGen(imgSize)
+    converter.representative_dataset = lambda: representativeDatasetGen(imgSize, numCalBatches)
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
     converter.inference_input_type = tf.int8
     converter.inference_output_type = tf.int8
