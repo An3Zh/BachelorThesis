@@ -9,6 +9,7 @@
 #include <string>
 #include <sstream>
 #include <limits>
+#include <regex>
 #include <tensorflow/lite/interpreter.h>
 #include <tensorflow/lite/model.h>
 #include "tensorflow/lite/kernels/register.h"
@@ -35,7 +36,38 @@ QuantParams getOutputQuantParams(std::unique_ptr<tflite::Interpreter>& interpret
     return qp;
 }
 
-int main() {
+const std::pair<int, int>& getSceneGridSize(const std::string& sceneIdStr) {
+    static const std::map<int, std::pair<int, int>> sceneGridSizes = {
+        {3052,  {20, 21}}, {18008, {24, 24}}, {29032, {21, 21}}, {29041, {21, 21}},
+        {29044, {20, 21}}, {32030, {21, 21}}, {32035, {20, 21}}, {32037, {20, 21}},
+        {34029, {21, 21}}, {34033, {21, 21}}, {34037, {21, 21}}, {35029, {21, 21}},
+        {35035, {20, 21}}, {39035, {20, 21}}, {50024, {21, 21}}, {63012, {23, 23}},
+        {63013, {23, 23}}, {64012, {23, 23}}, {64015, {22, 22}}, {66014, {22, 23}}
+    };
+    int sceneId = std::stoi(sceneIdStr);
+    auto it = sceneGridSizes.find(sceneId);
+    if (it != sceneGridSizes.end()) {
+        return it->second;
+    }
+    throw std::runtime_error("Scene ID not found in grid size map!");
+}
+
+std::vector<float> readBinFile(const std::string& filePath, int numElements) {
+    std::vector<float> data(numElements);
+    std::ifstream fin(filePath, std::ios::binary);
+    if (!fin) {
+        std::cerr << "Failed to open input: " << filePath << std::endl;
+    }
+    fin.read(reinterpret_cast<char*>(data.data()), numElements * sizeof(float));
+    return data;
+}
+
+struct infResult {
+    int code;
+    std::string sceneId;
+};
+
+infResult inference() {
     // ---- Interactive Scene Selection ----
     std::string modelRoot = "/home/mendel/BA/dev/coral/shared";
     std::string scenesRoot = "/home/mendel/BA/dev/coral/shared/patches";
@@ -68,7 +100,7 @@ int main() {
     DIR* dir = opendir(inputFolder.c_str());
     if (!dir) {
         std::cerr << "Failed to open input directory: " << inputFolder << std::endl;
-        return 1;
+        return {1, sceneId};
     }
 
     struct dirent* entry;
@@ -112,7 +144,6 @@ int main() {
             std::chrono::duration<double, std::milli> inferenceMs = end - start;
             totalMs += inferenceMs.count();
             patchCount++;
-            std::cout << "Patch No:" << patchCount << std::endl;
 
             // ---- Dequantize output to float32 ----
             TfLiteTensor* outputTensor = interpreter->output_tensor(0);
@@ -127,7 +158,7 @@ int main() {
             std::ofstream fout(outPath, std::ios::binary);
             fout.write(reinterpret_cast<char*>(outFloat.data()), outputElements * sizeof(float));
 
-            std::cout << fileName << ": " << inferenceMs.count() << " ms" << std::endl;
+            std::cout << "Patch #" << patchCount << " : " << inferenceMs.count() << " ms" << std::endl;
         }
     }
 
@@ -135,7 +166,54 @@ int main() {
 
     std::cout << "Processed " << patchCount << " patches." << std::endl;
     if (patchCount > 0)
-        std::cout << "Average inference time: " << (totalMs / patchCount) << " ms" << std::endl;
+        std::cout << "Total inference time: " << (totalMs / 1000) << " s" << std::endl;
 
-    return 0; // Avoid EdgeTPU segfault
+    return {0, sceneId};
+}
+
+int stitchPatches(const std::string& sceneId) {
+    std::string scenesRoot = "/home/mendel/BA/dev/coral/shared/patches";
+    std::string inputFolder = scenesRoot + "/scene_" + sceneId + "_bin_patches";
+
+    DIR* dir = opendir(inputFolder.c_str());
+    if (!dir) {
+        std::cerr << "Failed to open input directory: " << inputFolder << std::endl;
+        return 1;
+    }
+
+    const int batch = 1, height = 192, width = 192, channels = 1;
+    const int inputElements = batch * height * width * channels;
+    auto [cols, rows] = getSceneGridSize(sceneId);
+
+    struct dirent* entry;
+    int patchCount = 0;
+    double totalMs = 0;
+
+    for (int i=0; i < cols*rows; i++) {
+        std::string fileName(entry->d_name);
+
+        if (fileName.length() > 4 && fileName.substr(fileName.length() - 4) == ".bin") {
+            std::string inPath = inputFolder + "/" + fileName;
+
+            // ---- Read float32 input ----
+            auto inputData = readBinFile(inPath, inputElements);
+        }
+    }
+
+    return 0;
+}
+
+int main() {
+    auto infRes = inference();
+    if (infRes.code == 0) {
+        //int stitchCode = stitchPatches(infRes.sceneId);
+        //if (stitchCode != 0) {
+        //    std::cerr << "Stitching failed for scene: " << infRes.sceneId << std::endl;
+        //}
+        return 0;
+    } 
+    else {
+        std::cerr << "Inference failed for scene: " << infRes.sceneId << std::endl;
+        return infRes.code;
+    }
 }
