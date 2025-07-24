@@ -3,7 +3,7 @@ $aux_dir = 'build';
 $pdf_mode = 1;
 
 # Use pdflatex with basic flags
-$pdflatex = 'pdflatex -synctex=1 -interaction=nonstopmode %O %S';
+$pdflatex = 'pdflatex -synctex=1 -interaction=errorstopmode %O %S';
 
 # Force usage of Biber (instead of BibTeX)
 $bibtex_use = 2;

@@ -21,7 +21,7 @@
       "command": "latexmk",
       "args": [
         "-synctex=1",
-        "-interaction=nonstopmode",
+        "-interaction=errorstopmode",
         "-file-line-error",
         "-output-directory=build",
         "-pdf",

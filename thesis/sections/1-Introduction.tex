@@ -8,7 +8,7 @@
 
 Electronic components in satellites and spacecraft are exposed to intense radiation, high-energy particles, and extreme temperature fluctuations. To ensure reliability under these harsh conditions, manufacturers traditionally rely on certified space-grade components. However, design, production, and certification of such components are costly and time\--con\-su\-ming. 
 
-The AITHER project aims to investigate whether COTS (Commercial Off-The-Shelf) components can be effectively used in mano- and microsatellites (10-100 kg). Specifically, the project explores the feasibility of using COTS-based onboard architecture to perform reliable and computationally demanding tasks --- such as matrix operations in deep-learning based cloud segmenation --- directly in space. 
+The AITHER project aims to investigate whether COTS (Commercial Off-The-Shelf) components can be effectively used in nano- and microsatellites (10-100 kg). Specifically, the project explores the feasibility of using COTS-based onboard architecture to perform reliable and computationally demanding tasks --- such as matrix operations in deep-learning based cloud segmenation --- directly in space. 
 
 As part of this initiative, the 10kg nanosatellite OOV-CUBE was launched into orbit on July 9th 2024. Among its hosted payloads is the Coral Dev Board Mini – a single-board computer developed by Google with an embedded Edge TPU designed for fast, low-power machine learning inference in constrained environments.
 
@@ -21,5 +21,8 @@ While the satellite's structure was designed with radiation shielding and therma
 The goal of this thesis is to design, train and deploy a CNN model for cloud segmentation on the Coral Dev Board Mini. The core task is to adapt the model for efficient inference on the Edge TPU, overcoming hardware constraints while maintaining acceptable segmentation performance. This work serves as a demonstration of the potential to carry out deep learning inference onboard a satellite using COTS hardware.
 
 \subsection{Document structure}
+
+This thesis is structured as follows: in Chapter 2, preliminary knowledge on essential topics is introduced, along with the concept developed to achieve the goals of this thesis. Chapter 3 provides a detailed description of the implementation of these conceptual ideas. In Chapter 4, a quantitative evaluation of the obtained results is presented. Chapter 5 concludes the thesis by summarizing the key findings and providing an outlook on future work. A secondary goal of this thesis is to thoroughly document the entire process --- from initial concept to a fully functional solution –-- in a clear and practical manner, enabling efficient replication and learning from our experience.
+
 
 }

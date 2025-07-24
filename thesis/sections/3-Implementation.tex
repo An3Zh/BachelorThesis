@@ -4,6 +4,15 @@
 \setlength{\parskip}{1em}
 
 \section{Implementation}
+
+\todo{MILESTONES and difficuilties}
+
+3 milestones.
+1. Explain libedgtpu + tflite. How difficuilt it was to get the right TF version
+2. Seting up thunder compute instances, installing the right cuda
+3. C++ inference on coral board. Building the tflite library from source with the right TF version. 
+
+
 \subsection{Dataset loading pipeline}
 
 As mentioned in section 2.3, the dataset is split into 18 training and 20 test images. Each full scene is stored as a 16-bit unsigned integer .TIF file with four channels: RGB and NIR. \todo{ maybe add spectral range in nm} These images have a resolution of around 8000x8000 pixels and a size of approximately 130 MB. To reduce memory load and optimize training, validation and testing performance, the dataset is preprocessed by cropping each scene into smaller patches of 384x384 pixels.
@@ -75,6 +84,8 @@ By centralizing model definition and auxiliary functionality in model.py, the wo
 \todo{Put in Concept and cross reference quantization aware training, model architectures, maybe checkpoints, lr, early stopping. Batch normalization.
 Maybe this todo is relevant for the next immediate chapter}
 
+\subsection{Model training}
+
 \subsection{Converting the model}
 
 In order to convert the model after training to the Edge TPU format and to perform PTQ with calibration, several helper functions are defined in convert.py. As mentioned in [], the Edge TPU only supports models with a batch size of one. Howerver, for effective training, it is necessary to use and experiment with different batch sizes. Therefore, as the first step in the conversion process, the asBatchOne function transfers the trained weights to a new model with the exact same architecture but with an input batch size of one.
@@ -84,5 +95,11 @@ Next, using TensorFlow's TFLiteConverter, the model is converted to the .tflite 
 As the final step, the model is compiled for Edge TPU inference using the provided edgetpu-compiler (link). After successful compilation, all ops (explain what it is) in the model are ideally converted into a single Edge TPU custon op ready for deployment. If the compiler cannot map a certain op to the Edge TPU, it will be mapped to the CPU instead, which can significantly increase inference time. The goal of this thesis is to meet all model requirements for Edge TPU [chapter with requirements] and ensure that all ops are mapped to it. The aspired final model conversion result is illustrated below.
 
 \todo{TODO put netron.app with before and after compile. Describe it in text. Mention netron! Look out for other todos in text above!}
+
+\subsection{Inference on Edge TPU}
+
+\subsection{Evaluation pipeline}
+
+\todo{Smooth transition to evaluation chapter! Very nice!}
 
 }

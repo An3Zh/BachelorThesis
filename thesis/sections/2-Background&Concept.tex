@@ -3,14 +3,17 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{1em}
 
-\section{Background}
-\subsection{State-of-the-art CNNs for Cloud Image Segmentation}
+\section{Background \& Concept}
+\subsection{Background}
+\subsubsection{Satellite imagery for weather observation}
+OOV CUBE has only 3 channel camera, but the efficient cloud segmentation requires 4th NIR channel. \todo{expplain why}
+\subsubsection{State-of-the-art CNNs for Cloud Image Segmentation}
 
 CNNs are a class of neural networks that apply small, learnable filters --- known as convolutional kernels --– across an image to extract spatial features. A CNN typically consists of multiple convolutional layers stacked sequentionally. Each layer applies a set of filters that capture different visual patterns, such as edges or textures. As the network goes deeper, the spatial resolution of the image decreases, while the depth (i.e., number of channels) increases. This is a result of applying multiple filters and optionally using pooling layers, which downsample feature maps to reduce computational complexity and introduce spatial invariance.
 \todo{Explain briefly how they learn and optimize themselves, and what distinguishes them from just applying filters}
 In image segmentation tasks such as cloud detection, preserving spatial resolution is critical. Therefore, architectures often include an upsampling mechanism to reconstruct high-resolution output from compressed feature representations. This is achieved through transposed convolution (also known as deconvolution). While standard convolution reduces spatial resolution by aggregating local pixel values, transposed convolution performs the reverse: it distributes each value in the smaller feature map across a larger output, effectively increasing spatial dimensions and reversing the compression.
 
-One of the most influential architectures for image segmenation is the U-Net. Originally introduced by Ronneberger et al.~\cite{ronneberger2015u} for biomedical image segmentation, U-Net has become a standard in many domains, including remote sensing and cloud detection. A U-Net consists of an encoder-decoder structure. The encoder compresses the input image spatially while increasing its feature dimensionality. The decoder then reconstructs the spatial dimensions, progressively reducing the number of channels. The U-Net architecture shown in the diagram 1 was used by Mohajerani et al.~\cite{mohajerani2019cloudnet}  for their cloud detection algorithm.
+One of the most influential architectures for image segmenation is the U-Net. Originally introduced by Ronneberger et al.~\cite{ronneberger2015u} for biomedical image segmentation, U-Net has become a standard in many domains, including remote sensing and cloud detection. A U-Net consists of an encoder-decoder structure. The encoder compresses the input image spatially while increasing its feature dimensionality. The decoder then reconstructs the spatial dimensions, progressively reducing the number of channels. This results in output imgage, that has the same spatial dimensions height and width, but could have a various number of channels, depending on the perceived task. The U-Net architecture shown in the diagram 1 was used by Mohajerani et al.~\cite{mohajerani2019cloudnet}  for their cloud detection algorithm.
 
 \begin{figure}[H]
   \centering
@@ -22,7 +25,7 @@ One of the most influential architectures for image segmenation is the U-Net. Or
 
 A key innovation in U-Net is the use of residual (skip) connections \cite{he2015deepresiduallearningimage}, which dierectly link feature maps from the encoder to corresponding layers in the decoder with the same spatial size. These connections preserve fine-grained spatial details and significantly enhance segmentation quality. Moreover, they mitigate the vanishing gradient problem, facilitating the training of deeper networks and improving convergence.
 
-\subsection{Google Coral Dev Board Mini and Edge TPU}
+\subsubsection{Google Coral Dev Board Mini and Edge TPU}
 
 Running machine learning inference on embedded systems is referred to as edge inference. The Coral dev Board Mini, developed by Google, is a compact single-board computer designed for such edge AI applications. It features quad-core MediaTek 8167s System-on-a-Chip (SoC) on the Armv8-A architecture, along with a dedicated Edge TPU – a hardware accelerator optimized for executing TensorFlow Lite models using 8-bit integer operations.
 
@@ -48,12 +51,33 @@ The following image from Coral documentation summarizes the model conversion and
   \label{fig:quantization-chart}
 \end{figure}
 
-\subsection{38-Cloud Landsat 8 dataset}
+\subsubsection{Quantization}
+
+\subsubsection{38-Cloud Landsat 8 dataset}
 
 Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, near infrared (NIR), and thermal infrared bands \cite{landsat8}. For cloud segmentation tasks, the red, green, blue (RGB) and NIR channels are particularly valueable due to their ability to capture both visual and athmospheric information.
 
 This thesis utilizes a dataset consisting of 38 annotated satellite images from the Landsat 8 mission, commonly referred to as the 38-Cloud dataset \cite{38cloud}. The dataset has been introduced and adapted in the following scientific publications \cite{CloudNet2019}, \cite{CloudDet2018}. Each image contains four spectral channels (RGB and NIR), along with a manually annotated dround truth mask that labels cloud pixels at the pixel level.
 
 The dataset is divided into a training set containing 18 scenes and a test set with the remaining 20 scenes.
+
+
+\subsection{Concept}
+
+\subsubsection{Data Preparation}
+
+To efficiently utilize TensorFlows dataset loading and preprocessing capabilities, a versatile data handling method is implemented. A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function. This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility. The function outputs tf.data.Dataset (link) objects that are ready for immediate use in training pipelines.
+
+\subsubsection{Model Architecture}
+
+Separate from the dataset pipeline, the model architecture is developed independently. Given the lack of existing practical examples and strict deployment constraints, the design process starts with a minimal architecture and gradually increases in complexity based on deployment success and evaluation feedback. A trial-and-error methodology is applied, with iterative adjustments made in response to embedded systems limitations. These limitations necessitate such architectural decisions, as the use of quantization aware training (QAT). For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
+
+\subsubsection{Quantization aware training}
+\subsubsection{Post training quantization and conversion}
+\subsubsection{Deployment on Coral Dev Board Mini}
+\subsubsection{Evaluation}
+I wanna first conveniently have training, validation and test datasets ready for efficient TF training.
+Then the convenient model architecture builder needs to be implemented
+quantization aware training and post training quantization should be considered
 
 }
