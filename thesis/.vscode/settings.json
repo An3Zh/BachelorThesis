@@ -1,19 +1,10 @@
 {
-  
   "latex-workshop.latex.outDir": "build",
   "latex-workshop.view.pdf.viewer": "tab",
   "latex-workshop.latex.autoBuild.run": "onSave",
   "latex-workshop.synctex.afterBuild.enabled": true,
   "latex-workshop.intellisense.citation.backend": "biblatex",
   "latex-workshop.latex.rootFile.useSubFile": false,
-
-  "latex-workshop.latex.recipes": [
-    {
-      "name": "latexmk ➜ build",
-      "tools": ["latexmk"]
-    }
-  ],
-  "latex-workshop.latex.recipe.default": "latexmk ➜ build",
 
   "latex-workshop.latex.tools": [
     {
@@ -27,13 +18,32 @@
         "-pdf",
         "%DOC%"
       ]
+    },
+    {
+      "name": "makeglossaries",
+      "command": "makeglossaries",
+      "args": [
+        "-d",
+        "build",
+        "%DOCFILE%"
+      ]
     }
   ],
 
-  //"latex-workshop.latex.clean.fileTypes": [
-  //  "*.aux", "*.bbl", "*.blg", "*.idx", "*.ind", "*.lof",
-  //  "*.lot", "*.out", "*.toc", "*.acn", "*.acr", "*.alg", "*.glg",
-  //  "*.glo", "*.gls", "*.ist", "*.fls", "*.fdb_latexmk", "*.synctex.gz"
-  //],
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk ➜ build (fast, on save)",
+      "tools": ["latexmk"]
+    },
+    {
+      "name": "latexmk ➜ makeglossaries ➜ latexmk (for acronyms/glossaries)",
+      "tools": ["latexmk", "makeglossaries", "latexmk"]
+    }
+  ],
 
+  "latex-workshop.latex.recipe.default": "latexmk ➜ build (fast, on save)",
+  
+  "files.exclude": {
+    "build": true
+  }
 }

@@ -12,7 +12,6 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{enumitem}
-\usepackage[colorlinks=true, allcolors=blue]{hyperref}
 \usepackage{setspace}
 \usepackage{csquotes}
 \usepackage{newtxtext,newtxmath}  % Times-like text and math
@@ -23,8 +22,18 @@
 \setuptodonotes{inline}
 \addbibresource{bibliography.bib}
 \setstretch{1.2} % Optional, for slight line spacing
+%\usepackage[toc,acronym]{glossaries}
+%\makeglossaries
+%\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+%\glsaddhyper
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage[acronym, toc]{glossaries-extra}
+\makeglossaries
+%\glsaddall
+\glssetcategoryattribute{acronym}{nohyperfirst}{false}
 
-% Font: use default Latin Modern – nothing else needed
+\input{sections/auxiliar/acronyms.tex}
+% Font: use default Latin Modern - nothing else needed
 
 % No page numbers on title page
 \pagestyle{plain}
@@ -39,8 +48,11 @@
 
 \tableofcontents
 
+
+\printglossary[type=\acronymtype, title=List of Acronyms, toctitle=List of Acronyms]
+
 \include{sections/1-Introduction.tex}
-\include{sections/2-Background&Concept.tex}
+\include{sections/2-Preliminaries.tex}
 \include{sections/3-Implementation.tex}
 \include{sections/4-Evaluation.tex}
 \include{sections/5-Conclusions&Out.tex}
