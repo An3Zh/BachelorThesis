@@ -1,18 +1,14 @@
 {
 
-\setlength{\parindent}{0pt}
+%\setlength{\parindent}{0pt}
 \setlength{\parskip}{1em}
 
-\section{Preliminaries}
-\glsfirst{ai}
-\gls{ai}
-\gls{ml}
-\gls{bubu}
-\gls{biba}
-\subsection{Background}
-\subsubsection{Satellite imagery for weather observation}
+\chapter{Preliminaries}
+
+\section{Context}
+\subsection{Satellite Imagery}
 OOV CUBE has only 3 channel camera, but the efficient cloud segmentation requires 4th NIR channel. \todo{expplain why}
-\subsubsection{State-of-the-art CNNs for Cloud Image Segmentation}
+\subsection{State-of-the-Art}
 
 CNNs are a class of neural networks that apply small, learnable filters --- known as convolutional kernels --- across an image to extract spatial features. A CNN typically consists of multiple convolutional layers stacked sequentionally. Each layer applies a set of filters that capture different visual patterns, such as edges or textures. As the network goes deeper, the spatial resolution of the image decreases, while the depth (i.e., number of channels) increases. This is a result of applying multiple filters and optionally using pooling layers, which downsample feature maps to reduce computational complexity and introduce spatial invariance.
 \todo{Explain briefly how they learn and optimize themselves, and what distinguishes them from just applying filters}
@@ -30,15 +26,99 @@ One of the most influential architectures for image segmenation is the U-Net. Or
 
 A key innovation in U-Net is the use of residual (skip) connections \cite{he2015deepresiduallearningimage}, which dierectly link feature maps from the encoder to corresponding layers in the decoder with the same spatial size. These connections preserve fine-grained spatial details and significantly enhance segmentation quality. Moreover, they mitigate the vanishing gradient problem, facilitating the training of deeper networks and improving convergence.
 
-\subsubsection{38-Cloud Landsat 8 dataset}
+\subsection{Dataset}
+\label{subsec:dataset}
 
-Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, near infrared (NIR), and thermal infrared bands \cite{landsat8}. For cloud segmentation tasks, the red, green, blue (RGB) and NIR channels are particularly valueable due to their ability to capture both visual and athmospheric information.
+Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, \gls{nir}, and thermal infrared bands \cite{landsat8}. For cloud segmentation tasks, the \gls{rgb} and \gls{nir} channels are particularly valuable due to their ability to capture both visual and athmospheric information.
 
-This thesis utilizes a dataset consisting of 38 annotated satellite images from the Landsat 8 mission, commonly referred to as the 38-Cloud dataset \cite{38cloud}. The dataset has been introduced and adapted in the following scientific publications \cite{CloudNet2019}, \cite{CloudDet2018}. Each image contains four spectral channels (RGB and NIR), along with a manually annotated dround truth mask that labels cloud pixels at the pixel level.
+\todo{in satellite imagery add spectral ranges, explain why theyre useful for cloud detection and link datasets channels from 2.1.3 to the table of spectral ranges later, atmospheric information , clarify this. Rewrite better}
 
-The dataset is divided into a training set containing 18 scenes and a test set with the remaining 20 scenes.
+This thesis utilizes a dataset consisting of 38 annotated satellite images from the Landsat 8 mission, commonly referred to as the 38-Cloud:
+A Cloud Segmentation Dataset \cite{38cloud}.
+It has been introduced and adapted in the following scientific publications \cite{CloudNet2019}, \cite{CloudDet2018}.
+38 images are divided into a training set containing 18 scenes and a test set with the remaining 20 scenes.
+The folder structure of the dataset is illustrated below:
 
-\subsubsection{Google Coral Dev Board Mini and Edge TPU}
+\begin{figure}[H]
+\dirtree{%
+.1 38-Cloud Dataset.
+.2 38-Cloud\_training.
+.3 train\_red.
+.3 train\_green.
+.3 train\_blue.
+.3 train\_nir.
+.3 train\_gt.
+.3 Natural\_False\_Color.
+.3 Entire\_scene\_gts.
+.3 training\_patches\_38-Cloud.csv.
+.3 training\_sceneids\_38-Cloud.csv.
+.2 38-Cloud\_test.
+.3 test\_red.
+.3 test\_green.
+.3 test\_blue.
+.3 test\_nir.
+.3 test\_gt.
+.3 Natural\_False\_Color.
+.3 Entire\_scene\_gts.
+.3 test\_patches\_38-Cloud.csv.
+.3 test\_sceneids\_38-Cloud.csv.
+.2 training\_patches\_38-cloud\_nonempty.csv.
+}
+\caption{Folder structure of the 38-Cloud Dataset}
+\label{fig:dsFolderStruct}
+\end{figure}
+
+Each image consists of four spectral channels: \gls{rgb} and \gls{nir}, along with a manually annotated \gls{gt} mask that labels cloud regions at the pixel level.
+The four spectral channels are encoded using 16-bit unsigned integers per pixel, whereas the \gls{gt} masks are represented with 8-bit unsigned integers.
+A single raw image at full resolution of approximately \ensuremath{8000\times8000} pixels would result in a file size of around 1GB.
+Moreover, processing such images would require model input tensors of shape \ensuremath{batchsize\times8000\times8000\times4} in single-precision floating-point after normalization.
+Since efficient training typically necessitates a \ensuremath{batchsize} greater than one,
+this setup would impose substantial computational demands and significantly slow down both training and inference --- making it particularly unsuitable for deployment on embedded systems.
+To address this, the dataset is provided in a pre-cropped format, with each image and its corresponding \gls{gt} mask divided into 384x384 pixel patches.
+These patches are saved as \code{.TIF} files within their respective channel-specific directories, such as \code{train\_red}, \code{train\_green}, and so forth.
+The \gls{gt} patches are stored in \code{train\_gt} directories. Additionally, full scene \gls{gt} masks are available in the \code{Entire\_scene\_gts} directories.
+
+\newpage
+
+Each \gls{rgb}, \gls{nir}, and \gls{gt} patch follows a unified filename convention:
+
+\begin{lstlisting}
+<band>_patch_<ID>_<row>_by_<col>_<metadata>.TIF
+\end{lstlisting}
+
+The corresponding components are:
+
+\begin{description}[style=sameline, labelwidth=4cm, labelsep=0.3cm, leftmargin=5cm, font=\normalfont\ttfamily\bfseries, itemsep=0pt, topsep=0pt, parsep=0pt, align=left]
+  \item[band] Indicates the spectral band or \gls{gt} mask.
+  \item[ID] Patch's serial number in the scene.
+  \item[row \& col] Patch's position in the scene as row and column number. Cropping was applied left to right, top to bottom.
+  \item[metadata] Represents the original Landsat 8 scene identifier, acquisition date, and processing metadata.
+\end{description}
+
+An example filename:
+
+\begin{itemize}
+  \item \texttt{blue\_patch\_9\_1\_by\_9\_LC08\_L1TP\_003052\_20160120\_20170405\_01\_T1.TIF}
+\end{itemize}
+
+This naming scheme ensures consistency and supports automated patch retrieval across channels.
+
+For visualization purposes, the full scene images are rendered using a standard false-color composite in which the \gls{nir} band is mapped to red, red band to green, and green band to blue.
+This mapping coresponds to the commonly used \gls{cir} visualization in remote sensing \cite{cir1}.
+\gls{cir} imagery enhances features such as vegetation and clouds, which exhibit distinct reflectance patterns across the visible and \gls{nir} spectrum.
+However, these false-color visualizations were not used as input for the \gls{cnn} during training, validation, or inference.
+They served solely as visual references for qualitative insprection by the human observer.
+The corresponding images are located in the \code{Natural\_False\_Color} directories.
+
+\todo{check patches and scenes to verify what bands were replaced}
+\todo{provide 1 scene false color image and rgb nir gt patches as example images}
+
+Additionally .csv files containing lists of patch filenames and corresponding scene IDs were provided and leveraged for efficient dataset construction using TensorFlow data pipeline utilites.
+
+One notable detail is that, due to the cropping and padding of border patches (in order to achieve standard patch size 384x384) and the tilted geometry of Landsat 8 imagery, some resulting patches contain no meaningful information – appearing completelly black across all four channels. These empty patches were excluded from training and validation to avoid introducing noise or misleading the model.
+
+
+\subsection{Hardware}
 
 Running machine learning inference on embedded systems is referred to as edge inference. The Coral dev Board Mini, developed by Google, is a compact single-board computer designed for such edge AI applications. It features quad-core MediaTek 8167s System-on-a-Chip (SoC) on the Armv8-A architecture, along with a dedicated Edge TPU – a hardware accelerator optimized for executing TensorFlow Lite models using 8-bit integer operations.
 
@@ -64,11 +144,11 @@ The following image from Coral documentation summarizes the model conversion and
   \label{fig:quantization-chart}
 \end{figure}
 
-\subsubsection{Quantization}
+\subsection{Quantization}
 
 Quantization is a mathematical method that maps a large set of (typically continuous) values to a smaller, discrete and countable set. Its first practical application can be traced back to 1957, in the context of pulse-code modulation within the field of signal processing. The earliest formal scientific documentation of the method appears in a publication from 1982, which is based on a draft manuscript originally authored in 1957. \cite{firstQuantization}
 
-This technique is now widely employed in machine learning, where it is applied to the model weights and activations \cite{MLQuantization1}, \cite{MLQuantization2}. Quantization significantly reduces model size by compressing numerical precision, typically at the cost of a controlled reduction in accuracy. Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case --- symmetric absolute maximum (absmax) quantization. In the context of this work, the general asymetric approach is of primary importance.
+This technique is now widely employed in machine learning, where it is applied to the model weights and activations \cite{MLQuantization1}, \cite{MLQuantization2}. Quantization significantly reduces model size by compressing numerical precision, typically at the cost of a controlled reduction in accuracy. \todo{add paper or image by how much model size can be reduced} Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case --- symmetric absolute maximum (absmax) quantization. In the context of this work, the general asymetric approach is of primary importance.
 
 To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max}} \) of the original (floating-point) range, and \( q_{\text{min}} \) and \( q_{\text{max}} \) of the target (quantized) value set must be defined. Once these are known, the corresponding scale and zero-point parameters are computed according to the following equations:
 
@@ -140,20 +220,20 @@ It is important to emphasize that the scale parameter etirely defines the quanti
 In practice, more advanced quantization techniques may be employed, such as outlier-aware clipping, per-axis and per-tensor quantization, symmetric and asymmetric schemes, or methods like dynamic range adjustment and mixed-precision quantization. However, the detailed explanation of these techniques falls outside the scope of this thesis.
 
 
-\subsection{Concept}
+\section{Design}
 
-\subsubsection{Data Preparation}
+\subsection{Data}
 
-To efficiently utilize TensorFlows dataset loading and preprocessing capabilities, a versatile data handling method is implemented. A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function. This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility. The function outputs tf.data.Dataset (link) objects that are ready for immediate use in training pipelines.
+To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented. A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function. This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility. The function should output \code{tf.data.Dataset} objects \cite{tfDataset} that are ready for immediate use in training pipelines. \cite{tfPaper}
 
-\subsubsection{Model Architecture}
+\subsection{Model}
 
 Separate from the dataset pipeline, the model architecture is developed independently. Given the lack of existing practical examples and strict deployment constraints, the design process starts with a minimal architecture and gradually increases in complexity based on deployment success and evaluation feedback. A trial-and-error methodology is applied, with iterative adjustments made in response to embedded systems limitations. These limitations necessitate such architectural decisions, as the use of quantization aware training (QAT). For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
 
-\subsubsection{Quantization aware training}
-\subsubsection{Post training quantization and conversion}
-\subsubsection{Deployment on Coral Dev Board Mini}
-\subsubsection{Evaluation metrics}
+\subsection{Training}
+\subsection{Conversion}
+\subsection{Deployment}
+\subsection{Evaluation}
 I wanna first conveniently have training, validation and test datasets ready for efficient TF training.
 Then the convenient model architecture builder needs to be implemented
 quantization aware training and post training quantization should be considered

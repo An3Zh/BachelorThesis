@@ -3,7 +3,9 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{1em}
 
-\section{Implementation}
+\chapter{Implementation}
+
+The previous chapter outlined the design and rationale for each system component. The following sections describe the practical realization, with a focus on engineering decisions, code-level implementation, and hardware-specific challenges.
 
 \todo{MILESTONES and difficuilties}
 
@@ -13,26 +15,9 @@
 3. C++ inference on coral board. Building the tflite library from source with the right TF version. 
 
 
-\subsection{Dataset loading pipeline}
+\section{Data}
 
-As mentioned in section 2.3, the dataset is split into 18 training and 20 test images. Each full scene is stored as a 16-bit unsigned integer .TIF file with four channels: RGB and NIR. \todo{ maybe add spectral range in nm} These images have a resolution of around 8000x8000 pixels and a size of approximately 130 MB. To reduce memory load and optimize training, validation and testing performance, the dataset is preprocessed by cropping each scene into smaller patches of 384x384 pixels.
-
-Unlike typical RGB images used in computer vision, the channels are not combined. Instead, each channel is stored in its respective directory for both training and testing subsets. For visualization purposes, the full scene images are rendered using a standard false-color composite in which the NIR band is mapped to red, red to green, and green to blue. This mapping coresponds to the commonly used Color Infrared (CIR) visualization in remote sensing. CIR imagery enhances features such as vegetation and clouds, which exhibit distinct reflectance patterns across the visible and NIR spectrum.
-
-However, these false-color visualizations were not used as input for the CNN during training, validation, or inference. They served solely as visual references for qualitative insprection by the human observer.
-
-\todo{check patches and scenes to verify what bands were replaced}
-\todo{provide 1 scene false color image and rgb nir gt patches as example images}
-
-The following folder structure of the dataset was used:
-
-\todo{provide folder structure}
-
-Additionally .csv files containing lists of patch filenames and corresponding scene IDs were provided and leveraged for efficient dataset construction using TensorFlow data pipeline utilites.
-
-One notable detail is that, due to the cropping and padding of border patches (in order to achieve standard patch size 384x384) and the tilted geometry of Landsat 8 imagery, some resulting patches contain no meaningful information – appearing completelly black across all four channels. These empty patches were excluded from training and validation to avoid introducing noise or misleading the model.
-
-\subsubsection{Train and validation subsets}
+\subsection{Training \& Validation}
 
 To build a training and validation pipeline, the function BuildDS was implemented along with several supporting helper functions, all included in the load.py file. Later on, the function was extended to optionally load the test dataset as well – this will be discussed separately in !!!Test subset!!!
 
@@ -56,7 +41,7 @@ As final preparation steps, the dataset is: shuffled, batched, prefetched, and s
 \todo{handle all references and formattings}
 \todo{maybe add code snippets}
 
-\subsubsection{Test subset}
+\subsection{Testing}
 
 The buildDS funciton additionally provides functionality to load and construct the test dataset used for model evaluation. There are two available modes for buildung the test pipeline:
 
@@ -71,7 +56,7 @@ Unlike training and validation datasets, the test dataset is not shuffled. This 
 
 Since per-patch ground truth annotations are not provided, evaluation requires stitching the patches back into their original scene layout. This is done using the stitchPatches function, which reconstructs the entire scene by aligning the patches along their original positions. The function supports stitching either a single selected scene or all scenes in the test set.
 
-\subsection{Model architecture implementation}
+\section{Model}
 
 To facilitate flexible experimentation with different model architectures, the core building blocks and utility functions are organized in model.py. The CNN models are constructed using TensorFlow’s built-in APIs, allowing for modular and reusable design. To simplify architecture changes and streamline the process of constructing and loading different models, common patterns --- such as convolutional blocks --- are implemented as helper functions.
 
@@ -84,9 +69,9 @@ By centralizing model definition and auxiliary functionality in model.py, the wo
 \todo{Put in Concept and cross reference quantization aware training, model architectures, maybe checkpoints, lr, early stopping. Batch normalization.
 Maybe this todo is relevant for the next immediate chapter}
 
-\subsection{Model training}
+\section{Training}
 
-\subsection{Converting the model}
+\section{Conversion}
 
 In order to convert the model after training to the Edge TPU format and to perform PTQ with calibration, several helper functions are defined in convert.py. As mentioned in [], the Edge TPU only supports models with a batch size of one. Howerver, for effective training, it is necessary to use and experiment with different batch sizes. Therefore, as the first step in the conversion process, the asBatchOne function transfers the trained weights to a new model with the exact same architecture but with an input batch size of one.
 
@@ -96,9 +81,9 @@ As the final step, the model is compiled for Edge TPU inference using the provid
 
 \todo{TODO put netron.app with before and after compile. Describe it in text. Mention netron! Look out for other todos in text above!}
 
-\subsection{Inference on Edge TPU}
+\section{Deployment}
 
-\subsection{Evaluation pipeline}
+\section{Evaluation}
 
 \todo{Smooth transition to evaluation chapter! Very nice!}
 

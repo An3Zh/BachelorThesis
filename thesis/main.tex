@@ -1,5 +1,5 @@
-\documentclass[12pt]{article}
-
+\documentclass[12pt]{scrreprt}
+\usepackage{lmodern} % or newtxtext, etc.
 % Language
 \usepackage[english]{babel} % or [english] depending on your thesis language
 %\usepackage[utf8]{inputenc}
@@ -13,15 +13,30 @@
 \usepackage{amsmath}
 \usepackage{enumitem}
 \usepackage{setspace}
+
+\usepackage{listings}
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=none,
+  showstringspaces=false,
+  aboveskip=10pt,
+  belowskip=10pt
+}
+
+%\onehalfspacing
+%\doublespacing
+%\setstretch{1.2} % Optional, for slight line spacing
 \usepackage{csquotes}
-\usepackage{newtxtext,newtxmath}  % Times-like text and math
+%\usepackage{newtxtext,newtxmath}  % Times-like text and math
+\usepackage{mathpazo}
 \usepackage[backend=biber, style=numeric, url=true]{biblatex}
 \usepackage{float}
 \setlength{\marginparwidth}{2cm}
 \usepackage{todonotes}
+\usepackage{dirtree}
 \setuptodonotes{inline}
 \addbibresource{bibliography.bib}
-\setstretch{1.2} % Optional, for slight line spacing
 %\usepackage[toc,acronym]{glossaries}
 %\makeglossaries
 %\usepackage[colorlinks=true, allcolors=blue]{hyperref}
@@ -30,9 +45,11 @@
 \usepackage[acronym, toc]{glossaries-extra}
 \makeglossaries
 %\glsaddall
+\setabbreviationstyle[acronym]{long-short} 
 \glssetcategoryattribute{acronym}{nohyperfirst}{false}
 
 \input{sections/auxiliar/acronyms.tex}
+\input{sections/auxiliar/commands.tex}
 % Font: use default Latin Modern - nothing else needed
 
 % No page numbers on title page
