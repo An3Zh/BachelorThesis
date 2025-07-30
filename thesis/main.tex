@@ -6,17 +6,21 @@
 \usepackage[T1]{fontenc}
 
 % Page layout
-\usepackage[a4paper, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage[a4paper, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm]{geometry} %showframe
 
 % Essential packages
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{enumitem}
 \usepackage{setspace}
+\usepackage{changepage}
+\usepackage{tabularx}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}  % Left-aligned paragraph column
 
 \usepackage{listings}
 \lstset{
-  basicstyle=\small\ttfamily,
+  basicstyle=\footnotesize\ttfamily,
+  xleftmargin=\parindent,
   breaklines=true,
   frame=none,
   showstringspaces=false,

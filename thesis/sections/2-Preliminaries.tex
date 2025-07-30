@@ -78,45 +78,77 @@ To address this, the dataset is provided in a pre-cropped format, with each imag
 These patches are saved as \code{.TIF} files within their respective channel-specific directories, such as \code{train\_red}, \code{train\_green}, and so forth.
 The \gls{gt} patches are stored in \code{train\_gt} directories. Additionally, full scene \gls{gt} masks are available in the \code{Entire\_scene\_gts} directories.
 
-\newpage
+The examples of patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location are shown below as normalized greyscale images: 
+
+\begin{figure}[H] %htbp
+  \centering
+  \begin{tabular}{cccc}
+    \includegraphics[width=0.22\textwidth]{files/examples/red_patch.png}   &
+    \includegraphics[width=0.22\textwidth]{files/examples/green_patch.png} &
+    \includegraphics[width=0.22\textwidth]{files/examples/blue_patch.png}  &
+    \includegraphics[width=0.22\textwidth]{files/examples/nir_patch.png}   \\
+    (a) Red & (b) Green & (c) Blue & (d) NIR \\
+    \multicolumn{4}{c}{
+      \begin{tabular}{c}
+        \includegraphics[width=0.22\textwidth]{files/examples/gt_patch.png} \\
+        (e) Ground Truth
+      \end{tabular}
+    }
+
+  \end{tabular}
+  \caption{Four spectral input patches and the corresponding ground truth mask.}
+  \label{fig:patch_example}
+\end{figure}
 
 Each \gls{rgb}, \gls{nir}, and \gls{gt} patch follows a unified filename convention:
 
 \begin{lstlisting}
-<band>_patch_<ID>_<row>_by_<col>_<metadata>.TIF
+<band>_patch_<index>_<row>_by_<col>_<metadata>.TIF
 \end{lstlisting}
 
 The corresponding components are:
 
-\begin{description}[style=sameline, labelwidth=4cm, labelsep=0.3cm, leftmargin=5cm, font=\normalfont\ttfamily\bfseries, itemsep=0pt, topsep=0pt, parsep=0pt, align=left]
-  \item[band] Indicates the spectral band or \gls{gt} mask.
-  \item[ID] Patch's serial number in the scene.
-  \item[row \& col] Patch's position in the scene as row and column number. Cropping was applied left to right, top to bottom.
-  \item[metadata] Represents the original Landsat 8 scene identifier, acquisition date, and processing metadata.
-\end{description}
+\begin{tabularx}{0.97\textwidth}{@{\hspace{\parindent}}>{\ttfamily}p{2.7cm}@{\hspace{0.3em}}L}
+\textbf{band} \dotfill & Indicates the spectral band or \gls{gt} mask. \\
+\textbf{index} \dotfill & Ordinal number of the patch within the scene. Patches are extracted sequentionally from left to right, top to bottom. \\
+\textbf{row \& col} \dotfill & Patch's position in the scene, specified by its row and column indices. \\
+\textbf{metadata} \dotfill & Encodes the satellite and sensor ID, preprocessing precision, scene path/row, acquisition and processing dates, and collection tier metadata. \\
+\end{tabularx}
 
 An example filename:
 
-\begin{itemize}
-  \item \texttt{blue\_patch\_9\_1\_by\_9\_LC08\_L1TP\_003052\_20160120\_20170405\_01\_T1.TIF}
-\end{itemize}
+\begin{lstlisting}
+blue_patch_103_5_by_11_LC08_L1TP_063013_20160920_20170221_01_T1.TIF
+\end{lstlisting}
 
 This naming scheme ensures consistency and supports automated patch retrieval across channels.
+The filenames, excluding the \code{band} prefix, are listed in the \code{training\_patches\_38-Cloud.csv} and \code{test\_patches\_38-Cloud.csv} files, respectively.
+The corresponding scene-level filenames are stored in \code{training\_sceneids\_38-Cloud.csv} and \code{test\_sceneids\_38-Cloud.csv}.
+
+One notable detail is that, due to the cropping and padding of border patches (to standardise the patch size to 384x384) and the tilted geometry of Landsat 8 imagery,
+some resulting patches contain no meaningful information --- appearing completelly black with all-zero pixel values across all four channels.
+These zero-information patches were excluded from the training and validation sets to avoid overrepresenting non-informative inputs,
+which could degrade the model's ability to learn meaningful patterns.
+The remaining useful patch names are stored in \code{training\_patches\_38-cloud\_nonempty.csv} file.
+
+Together, these \code{.csv} files serve as the basis for dataset construction, as discussed in \secshortref{sec:data}.
+Furthermore, the embedded attributes such as \code{index}, \code{row \& col} will be directly utilized during the stitching process described in \secshortref{subsec:testing}.
 
 For visualization purposes, the full scene images are rendered using a standard false-color composite in which the \gls{nir} band is mapped to red, red band to green, and green band to blue.
 This mapping coresponds to the commonly used \gls{cir} visualization in remote sensing \cite{cir1}.
+\todo{check patches and scenes to verify what bands were replaced}
 \gls{cir} imagery enhances features such as vegetation and clouds, which exhibit distinct reflectance patterns across the visible and \gls{nir} spectrum.
 However, these false-color visualizations were not used as input for the \gls{cnn} during training, validation, or inference.
-They served solely as visual references for qualitative insprection by the human observer.
+They served solely as visual references for qualitative inspection by the human observer.
 The corresponding images are located in the \code{Natural\_False\_Color} directories.
+An example scene is shown below as a false-color composite: 
 
-\todo{check patches and scenes to verify what bands were replaced}
-\todo{provide 1 scene false color image and rgb nir gt patches as example images}
-
-Additionally .csv files containing lists of patch filenames and corresponding scene IDs were provided and leveraged for efficient dataset construction using TensorFlow data pipeline utilites.
-
-One notable detail is that, due to the cropping and padding of border patches (in order to achieve standard patch size 384x384) and the tilted geometry of Landsat 8 imagery, some resulting patches contain no meaningful information – appearing completelly black across all four channels. These empty patches were excluded from training and validation to avoid introducing noise or misleading the model.
-
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{files/examples/scene.jpg}
+  \caption{False-color composite of an entire scene.}
+  \label{fig:false_color_scene}
+\end{figure}
 
 \subsection{Hardware}
 

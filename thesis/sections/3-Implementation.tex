@@ -16,6 +16,7 @@ The previous chapter outlined the design and rationale for each system component
 
 
 \section{Data}
+\label{sec:data}
 
 \subsection{Training \& Validation}
 
@@ -42,6 +43,7 @@ As final preparation steps, the dataset is: shuffled, batched, prefetched, and s
 \todo{maybe add code snippets}
 
 \subsection{Testing}
+\label{subsec:testing}
 
 The buildDS funciton additionally provides functionality to load and construct the test dataset used for model evaluation. There are two available modes for buildung the test pipeline:
 
@@ -55,6 +57,8 @@ After loading the filenames, the pipeline follows a similar flow to the training
 Unlike training and validation datasets, the test dataset is not shuffled. This is necessary to preserve the spatial order of patches for later reconstruction. The dataset is batched and prefetched for efficient processing.
 
 Since per-patch ground truth annotations are not provided, evaluation requires stitching the patches back into their original scene layout. This is done using the stitchPatches function, which reconstructs the entire scene by aligning the patches along their original positions. The function supports stitching either a single selected scene or all scenes in the test set.
+
+\todo{padding of patches and back explain center padding and that the stitched images arent the same size as scenes}
 
 \section{Model}
 
