@@ -4,6 +4,7 @@
 \setlength{\parskip}{1em}
 
 \chapter{Implementation}
+\label{chapter:implementation}
 
 The previous chapter outlined the design and rationale for each system component. The following sections describe the practical realization, with a focus on engineering decisions, code-level implementation, and hardware-specific challenges.
 
@@ -20,62 +21,176 @@ The previous chapter outlined the design and rationale for each system component
 
 \subsection{Training \& Validation}
 
-To build a training and validation pipeline, the function BuildDS was implemented along with several supporting helper functions, all included in the load.py file. Later on, the function was extended to optionally load the test dataset as well – this will be discussed separately in !!!Test subset!!!
+In order to construct the training and validation pipeline, the function \code{BuildDS} was implemented, along with several supporting helper functions, all located in the \code{load.py} file.
+The function was later extended to optionally include the test dataset, which will be discussed in \secshortref{subsec:testing}.
 
-For efficient data handling and memory management, built-in TensorFlow utilities (referred to as tf in the following text and code) were used. Specifically, tf.Data.TextLineDataset() was used to read the .csv file line by line – each line representing the filename of a patch – which served as the foundation for the dataset pipeline.
+Efficient data handling and memory management are achieved through the use of built-in \gls{tf} utilities.
+In particular, the \code{tf.Data.TextLineDataset} function~\cite{tfTextLineDataset} is employed to sequentionally read the \code{.csv} files,
+which contain the patch filenames as outlined in \secshortref{subsec:dataset}.
+This provides the foundation for the dataset pipeline.
 
-The complete training subset originally contains 8400 patches. However, as noted earlier in !!!chapter!!!, only 5155 of them actually contain valid data and are therefore used for training and validation. The dataset is shuffled and then split into training and validation subsets. The ration between the two can be configured as needed.
+The complete training set originally contains 8400 patches. However, as explained earlier in \secshortref{subsec:dataset}, some patches are entirely zero-valued.
+Only 5155 of them contain valid data and are thus retained for subsequent use.
+The dataset is shuffled and split into training and validation subsets, with the ratio configurable as needed.
 
-Using the .map methon, each text line is first expanded into five full paths: the corresponding red, green, blue, NIR and ground truth patch filenames. Each of these file paths is then replaced by ist actual image content, loaded as tensor. This transformation is implemented in the helper function loadDS, which itself calls another utility, loadTIF. At this stage, each dataset element is a tuple of TensorFlow tensors representing the input image and its corresponding ground truth.
+Using the \code{.map} method, each text line is first expanded into five full paths to the corresponding \gls{rgb}, \gls{nir} and \gls{gt} mask patches.
+Each filepath is then replaced by its image content, loaded as \code{tf.Tensor}~\cite{tfTensor}.
+This transformation is handled by the helper function \code{loadDS}, which itself calls utility function \code{loadTIF}.
+At this stage, each dataset element is a tuple of \gls{tf} tensors representing the four-channel input image and its corresponding \gls{gt} mask.
 
-The loadDS together with loadTIF function are loading each .TIF image and performing the necessary conversions:
+The \code{loadDS} and \code{loadTIF} functions perform the following operations:
 
 \begin{itemize}
-    \item RGB and NIR patches, originally stored as 16-bit unsigned integers (range 0 - 65535), are cast to float32 and normalized to the range 0-1
-    \item Ground truth masks, which originally contain values of either 0 or 255 (as uint8), are binarizes to values of 0 and 1, and also cast to float32
+    \item RGB and NIR patches are cast to \gls{float32} and normalized to the range [0,1].
+    \item \gls{gt} masks, originally in \gls{uint8}, are binarized to values of 0 and 1, and also cast to \gls{float32}.
 \end{itemize}
 
-An additional feature of the loadDS function allows optional resizing (downsampling) of the input images, if a target image size is provided. Importantly, the image loading and transormation pipeline ensures no information loss up to the point of resizing, where a reduction in resolution is intentional and controlled.
+An additional feature of the \code{loadDS} function allows for optional resizing of the input images if a target size is provided.
+The image loading and transormation pipeline is designed to avoid information loss until the controlled resizing step, where a reduction in resolution is intentional.
+In the case of resizing, \gls{gt} masks are resized using nearest-neighbor interpolation. This method copies the value of the closest original pixel for each target pixel,
+thus preserving hard edges in the cloud segmentation mask and avoiding the introduction of intermediate values.
+Conversely, the \gls{rgb} and \gls{nir} inputs are resized with bilinear interpolation,
+which computes each new pixel value as a weighted average of the nearest $2\times2$ neighborhood. This results in smooth pixel transitions while maintaining important image details.
+Nearest-neighbor interpolation is among the eraliest digital image resizing techniques, dating back to the origins of digital image processing in the 1960s,
+whereas bilinear interpolation gained prominence in early computer graphics literature and is now standard in deep learning pipelines~\cite{bilinearNearest1, bilinearNearest2}.
 
-As final preparation steps, the dataset is: shuffled, batched, prefetched, and set to repeat indefinitely (cycled).
+As a final preparation step, the dataset is: shuffled, batched, set to repeat indefinitely,
+and prefetched to optimize data retrieval during training.
+Because the datasets are repeated indefinitely, it is essential to define the number of steps required to complete one full pass through the training and validation subsets.
+These step counts are computed as follows: \ensuremath{trainSteps = trainSubsetSize / batchSize}, \ensuremath{valSteps = valSubsetSize / batchSize},
+and are used to ensure the correct number of iterations per epoch during training.
 
-\todo{handle all references and formattings}
 \todo{maybe add code snippets}
 
 \subsection{Testing}
 \label{subsec:testing}
 
-The buildDS funciton additionally provides functionality to load and construct the test dataset used for model evaluation. There are two available modes for buildung the test pipeline:
+An additional capability of the \code{buildDS} is the construction of the test dataset.
+As outlined in \secshortref{subsec:dataset}, only cropped \gls{rgb} and \gls{nir} test patches, together with complete scene \gls{gt} masks, are available for testing.
+This arrangement necessitates two specific preparation steps prior to building the test pipeline:
+
+\begin{enumerate}
+    \item \textbf{Metadata collection:} To uniquely identify each scene, the \code{sceneID} is introduced, derived from the Landsat 8 metadata (path/row),
+    and is unique within this test dataset. The total number of patches, as well as the number of rows and columns for each scene, is collected for every \code{sceneID}.
+    The patch filenames, as outlined in \secshortref{subsec:dataset}, are used for this process.
+    Additional \code{.csv} files were manually created --- each containing the ordered patch filenames corresponding to every full scene.
+    Filenames in these \code{.csv} files are organized in the order resulting from cropping (left to right, top to bottom).
+    Furthermore, the \code{fullTestDS.csv} file was generated, containing ordered patch filenames for all 20 full scenes.
+    These \code{.csv} files, not provided in the original dataset,
+    were developed in the scope of this thesis to support the test pipeline and are stored in the \code{additionalCSVs} folder within the testing subset.
+    Based on this manually collected metadata, the \code{getSceneGridSizes} function was implemented in \code{load.py} file,
+    returning a dictionary that maps each of the 20 \code{sceneID}s to the respective number of rows and columns in each scene.
+    \item \textbf{Patch stitching:} The \code{stitchPatches} function was implemented in \code{load.py}.
+    This function uses the \code{.csv} files and the \code{getSceneGridSizes} function to reconstruct entire scenes from the model's output patches for evaluation.
+    The function can operate in two modes: it can either stitch together all scenes at once, saving all 20 full scenes,
+    or stitch only a single specified scene. The rationale behind this design choice will be explained in the following paragraph.
+\end{enumerate}
+\todo{maybe move some content to design, especially with stitching etc. Why whole DS and only 1 scene. Add additionalCSVs in folder structure,
+mention it there and reference to that chapter or to design.}
+\todo{explain maybe in design why whole DS and why only 1 scene}
+
+Following these preparatory steps, the \code{buildDS} function was extended with additional functionality to construct the test subset.
+Using the optional boolean parameter \code{includeTestDS}, which indicates whether to include the test dataset, and the parameter \code{singleSceneID},
+which allows the selection of a specific scene, the function now supports multiple modes for testing:
 
 \begin{itemize}
-    \item Using all 9201 patches cropped from the 20 test scenes, or
-    \item Selecting patches from a single scene --- either by specifying its sceneID or allowing the function to randomly select one --- based on pre-generated .csv files that map patch names to sceneIDs.
+    \item Utilizing all 9201 patches from the 20 test scenes, or
+    \item Selecting patches from a single scene, either by specifying its \code{singleSceneID} or allowing the function to randomly select one.
+    %based on pre-generated \code{.csv} files that map patch names to \code{sceneID}.
 \end{itemize}
 
-After loading the filenames, the pipeline follows a similar flow to the training and validation datasets. However, ground truth masks are not available for individual test patches. Instead, each test dataset element is represented as a 384x384x4 (or predefined image size) float32 TensorFlow tensor containing the RGB and NIR channels.
+The dataset is then constructed using the same \gls{tf} utilities employed for the training and validation subsets.
+It is important to emphasize that the test set is not shuffled, as preserving the initial patch order is essential for the subsequent stitching process.
 
-Unlike training and validation datasets, the test dataset is not shuffled. This is necessary to preserve the spatial order of patches for later reconstruction. The dataset is batched and prefetched for efficient processing.
-
-Since per-patch ground truth annotations are not provided, evaluation requires stitching the patches back into their original scene layout. This is done using the stitchPatches function, which reconstructs the entire scene by aligning the patches along their original positions. The function supports stitching either a single selected scene or all scenes in the test set.
-
-\todo{padding of patches and back explain center padding and that the stitched images arent the same size as scenes}
+Consequently, the \code{buildDS} function returns the training and validation subsets, along with their respective step counts based on the \code{batchSize}.
+Optionally, it also returns test subset, which may contain either the entire test dataset or a single scene.
+After inference, the model's output patches can be passed to the \code{stitchPatches} function, which reconstruct and saves the final scene images for further evaluation.
 
 \section{Model}
 
-To facilitate flexible experimentation with different model architectures, the core building blocks and utility functions are organized in model.py. The CNN models are constructed using TensorFlow’s built-in APIs, allowing for modular and reusable design. To simplify architecture changes and streamline the process of constructing and loading different models, common patterns --- such as convolutional blocks --- are implemented as helper functions.
+The core building blocks and utility functions for architecting the model are organized in \code{model.py}.
+\glspl{cnn} are constructed using \gls{tf}'s built-in \glspl{api}, allowing for modular and reusable design.
 
-During development, it was necessary to test multiple model architectures and sizes. Therefore, the implementation supports fast and compatible switching between different models.
+To simplify architecture changes and streamline the process of constructing and loading different models,
+common pattern, such as convolutional block, is implemented in helper function \code{quantConvBlock}.
 
-Additionally, where standard TensorFlow loss functions are insufficient, custom loss functions such as Soft Jaccard Loss are implemented withing this module. This also includes custom metrics, for example, the Dice Coefficient, which are particularly relevant for evaluating segmentation tasks.
+During development, it was necessary to test multiple model architectures and sizes.
+Therefore, the implementation supports fast and compatible switching between different models using different architecture-building fuctions.
+For instance, \code{simpleModel} function compiles the pioneer simpliest \code{uNet} architecture used for proof of concept on \gls{edgetpu}.
+\code{uNet} model already represents the deep \code{uNet} architecture with \dots, model layers, however, are not annotaded for \gls{qat}.
 
-By centralizing model definition and auxiliary functionality in model.py, the workflow supports rapid iteration and clear separation between architecture design and the rest of the implementation pipeline.
+\todo{explain different architecture functions here, maybe even all of them. Mention \gls{qat} annotation} 
 
-\todo{Put in Concept and cross reference quantization aware training, model architectures, maybe checkpoints, lr, early stopping. Batch normalization.
-Maybe this todo is relevant for the next immediate chapter}
+Additionally, where standard \gls{tf} loss functions are insufficient, custom loss functions such as \code{softJaccardLoss} or \code{diceLoss} are implemented in model architectures.
+Custom metrics, particularly relevant for evaluation of segmentation tasks are also implemented within this module.
+These metrics include\dots
+\todo{describe metrics}
+
+\todo{mention binary crossentropy compared to softJaccardLoss! Maybe this in evaluation.}
 
 \section{Training}
 
+The complete model training and conversion pipeline is implemented in the \code{main.py} file.
+
+The process begins with configuration settings, which include:
+\begin{itemize}
+\item Batch size for training
+\item Image size for both training and inference
+\item Number of training epochs
+\item Selected model architecture
+\item Ratio between validation and training subsets
+\item Number of batches used for the calibration dataset
+\end{itemize}
+Additional settings can be incorporated as needed.
+
+The pipeline starts by loading the dataset using functions from \code{load.py}.
+The selected model architecture is then compiled utilizing utilities from \code{model.py}.
+
+Each training run is stored in a dedicated folder, named with a timestamp corresponding to the start of the run.
+This folder contains all configuration files, training-related artifacts, and final results, including the compiled \gls{edgetpu} model.
+
+Prior to training, the following configurations and callbacks are set up:
+
+\begin{itemize}
+\item \textbf{Model Checkpoints}: Model checkpoints are saved during training whenever the validation loss improves, preserving the best-performing model.
+\item \textbf{Early Stopping}: If the validation loss stops improving, training continues for a predefined number of additional epochs before termination.
+\item \textbf{Learning Rate Reduction}: The learning rate is reduced if the validation loss does not improve for a set number of epochs, helping to fine-tune convergence.
+\end{itemize}
+
+Once all configurations are saved, model training is initiated with the specified callbacks active.
+
+Upon completion of training, the final model weights are saved and immediately used for model conversion.
+
+\subsubsection{Technical Setup}
+
+Training of initial proof-of-concept models was performed on a personal workstation equipped with an Intel Core i5-13400F CPU and an NVIDIA GeForce RTX 4060 GPU.
+To enable GPU acceleration for the \gls{tf} training process, the NVIDIA \gls{cuda} \gls{api} and the corresponding \gls{cudnn} library must be installed and configured.
+The following versions were used: \gls{cuda} v11.2 and \gls{cudnn} v8.1.1.
+These versions are not the latest available from NVIDIA at the time of this work, but were selected for compatibility with certain \glspl{tfop} and the \code{libedgetpu} runtime library.
+Further details on these compatibility considerations are discussed in \secshortref{sec:conversion} and \secshortref{sec:deployment}.
+
+Initial models containing approximately 300,000 parameters were trained without \gls{qat} for tens of epochs.
+On the described setup and using the full training dataset, the time required for a single epoch was less than 15 seconds, which was deemed acceptable.
+
+With the introduction of more complex models containing 2,000,000 and 30,000,000 parameters, and when employing \gls{qat}, training times increased significantly.
+For these larger models, one epoch on the full training dataset required approximately 3 minutes and 12 minutes, respectively.
+Since at least 100 epochs were necessary to achieve adequate model performance, more powerful hardware resources became essential.
+
+Thunder Compute, an American startup providing GPU cloud resources for machine learning and data science, was utilized for large-scale experiments.
+By using an instance with an NVIDIA A100XL GPU, training times for the 2,000,000 parameter network were reduced to approximately 20 seconds per epoch,
+and for the 30,000,000 parameter network to 40 seconds per epoch.
+A \ensuremath{10\times} increase in GPU memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes, resulting in more effective training and improved model robustness.
+
+However, significant effort was required to configure the cloud instance for compatibility.
+The more expensive production mode had to be used, as the prototyping mode did not allow downgrading \gls{cuda} and \gls{cudnn} versions \cite{thundercomputeProtProd}.
+The \gls{cuda} and \gls{cudnn} libraries needed to be downgraded from their most recent platform versions to those compatible with an older \gls{tf} version.
+This was challenging, as it required purging the latest \gls{cuda} and \gls{cudnn} files without removing the GPU drivers required by the older versions.
+Ultimately, \gls{cuda} v... and \gls{cudnn} v... were installed on the instance for subsequent training.
+In addition, the Thunder Compute development team was contacted with a suggestion to allow selection of \gls{cuda} and \gls{cudnn} versions at instance creation.
+As a result, an improvement is planned that will allow passing the desired \gls{cuda} and \gls{cudnn} version as an environment variable during instance startup.
+
 \section{Conversion}
+\label{sec:conversion}
 
 In order to convert the model after training to the Edge TPU format and to perform PTQ with calibration, several helper functions are defined in convert.py. As mentioned in [], the Edge TPU only supports models with a batch size of one. Howerver, for effective training, it is necessary to use and experiment with different batch sizes. Therefore, as the first step in the conversion process, the asBatchOne function transfers the trained weights to a new model with the exact same architecture but with an input batch size of one.
 
@@ -86,6 +201,7 @@ As the final step, the model is compiled for Edge TPU inference using the provid
 \todo{TODO put netron.app with before and after compile. Describe it in text. Mention netron! Look out for other todos in text above!}
 
 \section{Deployment}
+\label{sec:deployment}
 
 \section{Evaluation}
 

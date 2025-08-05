@@ -29,7 +29,7 @@ A key innovation in U-Net is the use of residual (skip) connections \cite{he2015
 \subsection{Dataset}
 \label{subsec:dataset}
 
-Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, \gls{nir}, and thermal infrared bands \cite{landsat8}. For cloud segmentation tasks, the \gls{rgb} and \gls{nir} channels are particularly valuable due to their ability to capture both visual and athmospheric information.
+Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, \gls{nir}, and Thermal Infrared bands \cite{landsat8}. For cloud segmentation tasks, the \gls{rgb} and \gls{nir} channels are particularly valuable due to their ability to capture both visual and athmospheric information.
 
 \todo{in satellite imagery add spectral ranges, explain why theyre useful for cloud detection and link datasets channels from 2.1.3 to the table of spectral ranges later, atmospheric information , clarify this. Rewrite better}
 
@@ -57,7 +57,6 @@ The folder structure of the dataset is illustrated below:
 .3 test\_green.
 .3 test\_blue.
 .3 test\_nir.
-.3 test\_gt.
 .3 Natural\_False\_Color.
 .3 Entire\_scene\_gts.
 .3 test\_patches\_38-Cloud.csv.
@@ -69,16 +68,22 @@ The folder structure of the dataset is illustrated below:
 \end{figure}
 
 Each image consists of four spectral channels: \gls{rgb} and \gls{nir}, along with a manually annotated \gls{gt} mask that labels cloud regions at the pixel level.
-The four spectral channels are encoded using 16-bit unsigned integers per pixel, whereas the \gls{gt} masks are represented with 8-bit unsigned integers.
+The four spectral channels are encoded using \glspl{uint16} per pixel, whereas the \gls{gt} masks are represented with \glspl{uint8}.
 A single raw image at full resolution of approximately \ensuremath{8000\times8000} pixels would result in a file size of around 1GB.
-Moreover, processing such images would require model input tensors of shape \ensuremath{batchsize\times8000\times8000\times4} in single-precision floating-point after normalization.
+Moreover, processing such images would require model input tensors of shape \ensuremath{batchsize\times8000\times8000\times4} in \gls{float32} after normalization.
 Since efficient training typically necessitates a \ensuremath{batchsize} greater than one,
-this setup would impose substantial computational demands and significantly slow down both training and inference --- making it particularly unsuitable for deployment on embedded systems.
+this setup would impose substantial computational demands due to increased model size and would significantly slow down both training and inference ---
+making it particularly unsuitable for deployment on embedded systems.
 To address this, the dataset is provided in a pre-cropped format, with each image and its corresponding \gls{gt} mask divided into 384x384 pixel patches.
 These patches are saved as \code{.TIF} files within their respective channel-specific directories, such as \code{train\_red}, \code{train\_green}, and so forth.
-The \gls{gt} patches are stored in \code{train\_gt} directories. Additionally, full scene \gls{gt} masks are available in the \code{Entire\_scene\_gts} directories.
+The \gls{gt} patches for training are stored in the \code{train\_gt} directory.
 
-The examples of patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location are shown below as normalized greyscale images: 
+\todo{maybe describe it better, to distinguish between gt train and test}
+
+It is important to note, however, that pre-cropped \gls{gt} patches are not available for the test subset.
+Instead, complete scene \gls{gt} masks are provided in the \code{Entire\_scene\_gts} directories for both the train and test subsets.
+
+The examples of training patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location are shown below as normalized greyscale images: 
 
 \begin{figure}[H] %htbp
   \centering
@@ -125,7 +130,7 @@ This naming scheme ensures consistency and supports automated patch retrieval ac
 The filenames, excluding the \code{band} prefix, are listed in the \code{training\_patches\_38-Cloud.csv} and \code{test\_patches\_38-Cloud.csv} files, respectively.
 The corresponding scene-level filenames are stored in \code{training\_sceneids\_38-Cloud.csv} and \code{test\_sceneids\_38-Cloud.csv}.
 
-One notable detail is that, due to the cropping and padding of border patches (to standardise the patch size to 384x384) and the tilted geometry of Landsat 8 imagery,
+One notable detail is that, due to the cropping and padding of border patches (to standardise the patch size to \ensuremath{384\times384}) and the tilted geometry of Landsat 8 imagery,
 some resulting patches contain no meaningful information --- appearing completelly black with all-zero pixel values across all four channels.
 These zero-information patches were excluded from the training and validation sets to avoid overrepresenting non-informative inputs,
 which could degrade the model's ability to learn meaningful patterns.
@@ -151,6 +156,7 @@ An example scene is shown below as a false-color composite:
 \end{figure}
 
 \subsection{Hardware}
+\label{subsec:hardware}
 
 Running machine learning inference on embedded systems is referred to as edge inference. The Coral dev Board Mini, developed by Google, is a compact single-board computer designed for such edge AI applications. It features quad-core MediaTek 8167s System-on-a-Chip (SoC) on the Armv8-A architecture, along with a dedicated Edge TPU – a hardware accelerator optimized for executing TensorFlow Lite models using 8-bit integer operations.
 
@@ -177,12 +183,23 @@ The following image from Coral documentation summarizes the model conversion and
 \end{figure}
 
 \subsection{Quantization}
+\label{subsec:quantization}
 
-Quantization is a mathematical method that maps a large set of (typically continuous) values to a smaller, discrete and countable set. Its first practical application can be traced back to 1957, in the context of pulse-code modulation within the field of signal processing. The earliest formal scientific documentation of the method appears in a publication from 1982, which is based on a draft manuscript originally authored in 1957. \cite{firstQuantization}
+Quantization is a mathematical method that maps a large set of (typically continuous) values to a smaller, discrete and countable set.
+Its first practical application can be traced back to 1957, in the context of pulse-code modulation within the field of signal processing.
+The earliest formal scientific documentation of the method appears in a publication from 1982,
+which is based on a draft manuscript originally authored in 1957 \cite{firstQuantization}.
 
-This technique is now widely employed in machine learning, where it is applied to the model weights and activations \cite{MLQuantization1}, \cite{MLQuantization2}. Quantization significantly reduces model size by compressing numerical precision, typically at the cost of a controlled reduction in accuracy. \todo{add paper or image by how much model size can be reduced} Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case --- symmetric absolute maximum (absmax) quantization. In the context of this work, the general asymetric approach is of primary importance.
+This technique is now widely employed in machine learning \cite{MLQuantization1, MLQuantization2}.
+Quantization significantly reduces model size by compressing numerical precision, typically at the cost of a controlled reduction in accuracy.
+\todo{add paper or image by how much model size can be reduced}
+Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case ---
+symmetric absolute maximum (absmax) quantization.
+In the context of this work, the general asymetric approach is of primary importance.
 
-To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max}} \) of the original (floating-point) range, and \( q_{\text{min}} \) and \( q_{\text{max}} \) of the target (quantized) value set must be defined. Once these are known, the corresponding scale and zero-point parameters are computed according to the following equations:
+To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max}} \) of the original (floating-point) range,
+and \( q_{\text{min}} \) and \( q_{\text{max}} \) of the target (quantized) value set must be defined.
+Once these are known, the corresponding scale and zero-point parameters are computed according to the following equations:
 
 \begin{equation}
 \text{scale} = \frac{x_{\text{max}} - x_{\text{min}}}{q_{\text{max}} - q_{\text{min}}}
@@ -194,7 +211,8 @@ To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max
 \label{eq:zeropoint}
 \end{equation}
 
-With these parameters determined, input value \( x \) can be transformed into quantized form \( q_{\text{x}} \) and subsequently dequantized to an approximate value \( x_{\text{q}} \) using the following formulas:
+With these parameters determined,
+input value \( x \) can be transformed into quantized form \( q_{\text{x}} \) and subsequently dequantized to an approximate value \( x_{\text{q}} \) using the following formulas:
 
 \begin{equation}
 q_{\text{x}} = \text{round}\left(\frac{x}{\text{scale}} \right) + \text{zero-point}
@@ -206,9 +224,11 @@ x_{\text{q}} \approx \left( q_{\text{x}} - \text{zero-point} \right) \cdot \text
 \label{eq:dequantize}
 \end{equation}
 
-It is essential to note that both the scale and zero-point must be preserved in order to carry out the quantization and dequantization processes. For every value range subject to quantization, a unique pair of these parameters exists.
+It is essential to note that both the scale and zero-point must be preserved in order to carry out the quantization and dequantization processes.
+For every value range subject to quantization, a unique pair of these parameters exists.
 
-The following example demonstrates the use of zero-point quantization. Consider a set of continuous values ranging from -9.75 to 3.00. To map this range onto a discrete set defined by the integer interval [-128, 127], the scale and zero-point are calculated using equations \ref{eq:scale} and \ref{eq:zeropoint}:
+The following example demonstrates the use of zero-point quantization. Consider a set of continuous values ranging from -9.75 to 3.00.
+To map this range onto a discrete set defined by the integer interval [-128, 127], the scale and zero-point are calculated using equations \ref{eq:scale} and \ref{eq:zeropoint}:
 
 \begin{equation*}
 \text{scale} = \frac{3.00 - (-9.75)}{127 - (-128)} = 0.05
@@ -219,7 +239,9 @@ The following example demonstrates the use of zero-point quantization. Consider 
 \end{equation*}
 
 
-After this step, every value from the original dataset can be represented by its corresponding quantized counterpart. The following equations illustrate the quantization and subsequent dequantization of four examples using \ref{eq:quantize} and \ref{eq:dequantize}: \( x = 0 \), \( x = 3.00 \), \( x = 2.98 \), \( x = 2.95 \):
+After this step, every value from the original dataset can be represented by its corresponding quantized counterpart.
+The following equations illustrate the quantization and subsequent dequantization of four examples using \ref{eq:quantize} and \ref{eq:dequantize}:
+\( x = 0 \), \( x = 3.00 \), \( x = 2.98 \), \( x = 2.95 \):
 
 \begin{align*}
 q_{0} &= \text{round}\left(\frac{0}{0.05} \right) + 67 = 67
@@ -245,22 +267,88 @@ q_{2.95} &= \text{round}\left(\frac{2.95}{0.05} \right) + 67 = 126
 x_{126} &\approx \left( 126 - 67 \right) \cdot 0.05 = 2.95
 \end{align*}
 
-The last three examples implicitly 	demonstrate the loss of precision introduced by quantization. In this particular case, any input value between 2.95 and 3.00 will be represented, after conversion, by one of these two discrete values.
+The last three examples implicitly demonstrate the loss of precision introduced by quantization.
+In this particular case, any input value between 2.95 and 3.00 will be represented, after conversion, by one of these two discrete values.
 
-It is important to emphasize that the scale parameter etirely defines the quantizer's precision, under the assumption that the bit-width (i.e., 255 discrete representable values) is fixed, as well as the floating-point range from -9.75 to 3.00 being evenly distributed across the entire interval and free of outliers.
+It is important to emphasize that the scale parameter etirely defines the quantizer's precision,
+under the assumption that the bit-width (i.e., 255 discrete representable values) is fixed,
+as well as the floating-point range from -9.75 to 3.00 being evenly distributed across the entire interval and free of outliers.
 
-In practice, more advanced quantization techniques may be employed, such as outlier-aware clipping, per-axis and per-tensor quantization, symmetric and asymmetric schemes, or methods like dynamic range adjustment and mixed-precision quantization. However, the detailed explanation of these techniques falls outside the scope of this thesis.
+In practice, more advanced quantization techniques may be employed, such as outlier-aware clipping, per-axis and per-tensor quantization,
+symmetric and asymmetric schemes, or methods like dynamic range adjustment and mixed-precision quantization.
+While the detailed explanation of these methods falls outside the scope of this thesis,
+it is important to note that such techniques are already available within various \gls{tf} utilities, which will be utilized in this work.
 
+To quantize a deep learning model, its weights, biases, and, if required, its inputs, activations, and outputs must be quantized. This is performed through \gls{ptq}.
+Due to the previously described loss of precision introduced by quantization, model effectiveness metrics may degrade.
+To mitigate this, the model architecture can be adapted to perform \gls{qat} prior to \gls{ptq}.
+\gls{qat} does require additional computational operations, resulting in increased training time.
+It should be clarified that model training can be performed using various numerical data types for model parameters; in this work, however, \gls{float32} is used.
+
+\subsubsection{Quantization-Aware Training}
+
+The model architecture is modified by inserting quantization-dequantization operations at the edges, and by applying them to weights, biases, and activations.
+In the forward pass, dequantization is applied immediately after quantization for each \gls{qat}-annotated \gls{float32} value.
+In this way, all values remain in \gls{float32} format for training,
+but quantization inaccuracies are introduced, exposing the model to quantization effects during training and allowing it to adapt its parameters accordingly.
+
+The rounding function essential to quantization is, however, not differentiable. For this reason, the \gls{ste} is applied during the backward pass,
+setting the gradient of quantization operations to 1 within the quantized range and to 0 outside it.
+This allows gradients to flow through the quantization-dequantization operations \cite{qatBackwardPass}.
+
+At the end of \gls{qat}, the model parameters are adapted to the effects of quantization and will therefore exhibit better performance after quantization compared to a model trained without \gls{qat}.
+
+\todo{Insert Netron screenshot showing scales, quantizedwrappersV2, and bias scales in the implementation/conversion section. Explain scale and bit shifts for integer arithmetic on Coral.}
+
+\subsubsection{Post-Training Quantization}
+
+The actual conversion of model parameters is performed during \gls{ptq}.
+Regardless of whether \gls{qat} was performed, \gls{ptq} can always be applied to quantize a model.
+There are three common \gls{ptq} methods, with each subsequent method quantizing more parameters until all \gls{float32} values in the model are quantized:
+
+\begin{itemize}
+\item \textbf{Weight-Only Quantization}: Model weights and biases are statically determined after training;
+hence, their minimum and maximum values can be directly observed and used to calculate the scales and zero-points required for quantization.
+Model inputs, activations, and outputs, however, remain in \gls{float32} format. This method already reduces model size and speeds up inference.
+However, additional computations are needed at runtime to interface between quantized weights/biases and \gls{float32} inputs, activations, and outputs.
+\item \textbf{Dynamic Range Quantization}: This method extends weight-only quantization by quantizing the most computationally intensive
+operations (such as matrix multiplications and convolutions) to use integer arithmetic.
+For each such operation, the input activations are temporarily converted to a quantized format for computation, and the results are subsequently converted back to \gls{float32}.
+The model inputs, activations, and outputs remain in \gls{float32} format. No explicit range estimation is needed prior to conversion,
+as value ranges are determined dynamically at inference time or via heuristics. This approach offers further speed improvements with minimal impact on model accuracy.
+\item \textbf{Full-Integer Quantization}: In this method, all \gls{float32} values in the neural network, including inputs, activations, and outputs, are quantized.
+To accurately determine the value ranges of inputs, activations, and outputs, a representative (calibration) dataset is forward-passed through the model during conversion.
+The observed extrema are then used to set the quantization parameters for every tensor in the network. A key assumption is that the real inference data will have a similar value range.
+This trade-off maximally reduces model size and enables highly efficient inference using integer-only arithmetic.
+\end{itemize}
 
 \section{Design}
 
 \subsection{Data}
 
-To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented. A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function. This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility. The function should output \code{tf.data.Dataset} objects \cite{tfDataset} that are ready for immediate use in training pipelines. \cite{tfPaper}
+To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented.
+A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function.
+This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility.
+The function should output \code{tf.data.Dataset} objects \cite{tfDataset} that are ready for immediate use in training pipelines. \cite{tfPaper}
+\todo{cite main tf paper somwhere else earlier}
+
+Ideally, the testing pipeline should also be incorporated within this flexible, unified function.
+The absence of pre-cropped test subset \gls{gt} patches introduces the necessity for additional preparation steps.
 
 \subsection{Model}
 
-Separate from the dataset pipeline, the model architecture is developed independently. Given the lack of existing practical examples and strict deployment constraints, the design process starts with a minimal architecture and gradually increases in complexity based on deployment success and evaluation feedback. A trial-and-error methodology is applied, with iterative adjustments made in response to embedded systems limitations. These limitations necessitate such architectural decisions, as the use of quantization aware training (QAT). For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
+%Separate from the dataset pipeline, the model architecture is developed independently.
+The model architecture is tailored for deployment on embedded systems, where \gls{qat} must be taken into account.
+Due to the lack of existing practical examples for deploying this specific model architecture on \gls{edgetpu},
+the design process begins with a minimal configuration, using the smallest feasible number of layers and filters,
+and gradually increases in complexity based on deployment outcomes and evaluation feedback.
+An iterative, trial-and-error methodology is employed, allowing for adjustments in response to the resource constrains encountered on embedded hardware.
+
+The objective is to implement multiple configurable functions, each responsible for constructing a distinct model architecture.
+These functions include all necessary helper routines and utilities required to assemble the desired architecture,
+allowing convenient switching between models during training.
+%These limitations necessitate such architectural decisions, as the use of \gls{qat}.
+%For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
 
 \subsection{Training}
 \subsection{Conversion}

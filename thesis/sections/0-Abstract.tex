@@ -6,23 +6,59 @@
 
 \addchap{Zusammenfassung}
 
-Die Technische Universität Berlin hat am 01.01.2022 das Projekt AITHER ins Leben gerufen. Im Rahmen dieses Projekts wurde der \textit{OOV-CUBE} Satellit in die Erdumlaufbahn gebracht. An Bord befindet sich die KI-Daten\-ver\-ar\-bei\-tungs\-ein\-heit, auf der rechenintensive und zuverlässige Aufgaben durchgeführt werden sollen. Ziel des Projekts ist die Untersuchung der Strahlungstoleranz verschiedener Onboard-Architekturen unter Welt\-raum\-be\-ding\-un\-gen. Zu diesem Zweck soll ein KI-Modell entwickelt werden, das Rechenoperationen direkt an Bord ausführt. Die Aufgabe zur Wolkenerkennung auf den aufgenommenen Satellitenbildern eignet sich besonders gut dafür. Für die Berechnungen ist der KI-Beschleuniger -- in diesem Fall eine \textit{Tensor Processing Unit} (TPU) auf einem \textit{Google Coral Dev Board} -- zuständig. Die TPU wird die Tensoroperationen des Algorithmus zur Wolkenerkennung direkt im Orbit ausführen.
+Die Technische Universität Berlin hat am 01.01.2022 das Projekt AITHER ins Leben gerufen.
+Im Rahmen dieses Projekts wurde der \textit{OOV-CUBE} Satellit in die Erdumlaufbahn gebracht.
+An Bord befindet sich die KI-Daten\-ver\-ar\-bei\-tungs\-ein\-heit, auf der rechenintensive und zuverlässige Aufgaben durchgeführt werden sollen.
+Ziel des Projekts ist die Untersuchung der Strahlungstoleranz verschiedener Onboard-Architekturen unter Welt\-raum\-be\-ding\-un\-gen.
+Zu diesem Zweck soll ein KI-Modell entwickelt werden, das Rechenoperationen direkt an Bord ausführt.
+Die Aufgabe zur Wolkenerkennung auf den aufgenommenen Satellitenbildern eignet sich besonders gut dafür.
+Für die Berechnungen ist der KI-Beschleuniger,
+in diesem Fall eine \textit{\gls{tpu}} auf einem \textit{\gls{devboard}}, zuständig.
+Die \gls{tpu} wird die Tensoroperationen des Algorithmus zur Wolkenerkennung direkt im Orbit ausführen.
 
-In dieser Bachelorarbeit wird die Erkennung der Wolken auf den Satellitenbildern mithilfe von \textit{Convolutional Neural Network} (CNN) implementiert. Als Ausgangspunkt werden die \textit{state of the art} Architekturen der bestehenden CNNs zur Wolkenerkennung untersucht, wie sie beispielsweise in den wissenschaftlichen Artikeln \cite{CloudNet2019} und \cite{CloudDet2018} beschrieben sind. Das CNN wird speziell für die Ausführung auf einer eingebetteten Plattform \textit{Google Coral Dev Board} angepasst. Die fertige Lösung soll eine miniaturisierte Onboard-Da\-ten\-ver\-ar\-bei\-tungs\-ein\-heit sein, die auf den aufgenommenen Bildern direkt auf dem Satelliten im Orbit die Wolken erkennen kann.
+In dieser Bachelorarbeit wird die Erkennung der Wolken auf den Satellitenbildern mithilfe von \textit{\gls{cnn}} implementiert.
+Als Ausgangspunkt werden die \textit{state-of-the-art} Architekturen der bestehenden \glspl{cnn} zur Wolkenerkennung untersucht,
+wie sie beispielsweise in den wissenschaftlichen Artikeln \cite{CloudNet2019} und \cite{CloudDet2018} beschrieben sind.
+Das CNN wird speziell für die Ausführung auf einer eingebetteten Plattform \textit{\gls{devboard}} angepasst.
+Die fertige Lösung soll eine miniaturisierte Onboard-Da\-ten\-ver\-ar\-bei\-tungs\-ein\-heit sein,
+die auf den aufgenommenen Bildern direkt auf dem Satelliten im Orbit die Wolken erkennen kann.
 
-Es wird ein Datensatz aus der Landsat 8 Mission verwendet. Er umfasst 38 Wolkenbilder, die aus 4 Kanälen bestehen: Rot, Grün, Blau und Nahinfrarot. Um das Modell zu trainieren und zu validieren, wird dieser in Trainings- und Testdaten aufgeteilt. Die Funktionalität des Modells soll überprüft werden und die Performanz auf dem eingebetteten System wird evaluiert. 
+Es wird ein Datensatz aus der Landsat 8 Mission verwendet.
+Er umfasst 38 Wolkenbilder, die aus 4 Kanälen bestehen: \textit{\gls{rgb}} und \textit{\gls{nir}}.
+Um das Modell zu trainieren und zu validieren, wird dieser in Trainings- und Testdaten aufgeteilt.
+Die Funktionalität des Modells soll überprüft werden und die Performanz auf dem eingebetteten System wird evaluiert. 
 
-In weiteren Schritten sollte die Software auf den sich bereits im Orbit befindenden Satelliten \textit{OOV-CUBE} hochgeladen werden. Mit folgender wissenschaftlicher Mission wird nicht nur die Robustheit der handelsüblichen elektronischen Komponenten gegenüber kosmischen Strahlung untersucht, sondern auch die Möglichkeit geprüft, den Downlink vom Satelliten zur Erde zu entlasten, um die Effizienz von Erdbeobachtungs- und Kommunikationsmissionen zu erhöhen.
+In weiteren Schritten sollte die Software auf den sich bereits im Orbit befindenden Satelliten \textit{OOV-CUBE} hochgeladen werden.
+Mit folgender wissenschaftlicher Mission wird nicht nur die Robustheit der handelsüblichen elektronischen Komponenten gegenüber
+kosmischen Strahlung untersucht, sondern auch die Möglichkeit geprüft, den Downlink vom Satelliten zur Erde zu entlasten,
+um die Effizienz von Erdbeobachtungs- und Kommunikationsmissionen zu erhöhen.
 
 
 \addchap{Abstract}
 
-The Technical University of Berlin launched the AITHER project on January 1st, 2022. As part of this project the OOV-CUBE satellite was placed into Earth orbit. An onboard AI data processing unit is designed to perform computationally intensive and reliable tasks. The goal of the project is to study the radiation tolerance of different onboard architectures under space conditions. For this purpose, an AI model is being developed to perform calculations directly onboard. Cloud detection in satellite images is particularly well suited for this task. These computations are carried out by a dedicated AI hardware accelerator --- a Tensor Processing Unit (TPU) embedded on a Google Coral Dev Board. The TPU will execute the tensor operations of the cloud detection algorithm directly in orbit.
+The Technical University of Berlin launched the AITHER project on January 1st, 2022.
+As part of this project the OOV-CUBE satellite was placed into Earth orbit.
+An onboard AI data processing unit is designed to perform computationally intensive and reliable tasks.
+The goal of the project is to study the radiation tolerance of different onboard architectures under space conditions.
+For this purpose, an AI model is being developed to perform calculations directly onboard.
+Cloud detection in satellite images is particularly well suited for this task.
+These computations are carried out by a dedicated AI hardware accelerator --- a \gls{tpu} embedded on a \gls{devboard}.
+The \gls{tpu} will execute the tensor operations of the cloud detection algorithm directly in orbit.
 
-In this bachelor's thesis, the detection of clouds in satellite images is implemented using Convolutional Neural Network (CNN). The thesis begins by reviewing state-of-the-art CNN architectures for cloud detection, as described in scientific articles \cite{CloudNet2019} and \cite{CloudDet2018}. The CNN is specifically adapted to run on the embedded Google Coral Dev Board. The final solution will be a miniaturized data processing unit capable of detecting clouds directly onboard the satellite.
+In this bachelor's thesis, the detection of clouds in satellite images is implemented using \gls{cnn}.
+The thesis begins by reviewing state-of-the-art \gls{cnn} architectures for cloud detection,
+as described in scientific articles \cite{CloudNet2019} and \cite{CloudDet2018}.
+The \gls{cnn} is specifically adapted to run on the \gls{devboard}.
+The final solution will be a miniaturized data processing unit capable of detecting clouds directly onboard the satellite.
 
-A dataset from the Landsat 8 mission is used. It contains 38 cloud images, each consisting of four channels: red, green, blue, and near-infrared. The dataset is divided into training and test sets for model training and validation. The model's functionality will be verified, and its performance on the embedded system will be evaluated.
+A dataset from the Landsat 8 mission is used.
+It contains 38 cloud images, each consisting of four channels: \gls{rgb}, and \gls{nir}.
+The dataset is divided into training and test sets for model training and validation.
+The model's functionality will be verified, and its performance on the embedded system will be evaluated.
 
-In the next steps, the software is intended to be uploaded to the OOV-CUBE satellite already in orbit. The scientific mission aims not only to study the robustness of commercial electronic components against cosmic radiation but also to evaluate the potential for relieving the satellite-to-Earth downlink. This would improve the efficiency of Earth observation and communication missions.
+In the next steps, the software is intended to be uploaded to the OOV-CUBE satellite already in orbit.
+The scientific mission aims not only to study the robustness of commercial electronic components against cosmic radiation but also
+to evaluate the potential for relieving the satellite-to-Earth downlink.
+This would improve the efficiency of Earth observation and communication missions.
 
 }
