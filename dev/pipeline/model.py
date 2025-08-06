@@ -103,7 +103,7 @@ def BIGuNetQ(batchShape, filters=32):
 
     model = Model(inputs, outputs)
     model = quantize_apply(model)
-    model.compile(optimizer='adam', loss=softJaccardLoss, metrics=['accuracy', MeanIoU(num_classes=2), diceCoefficient, Precision, Recall])
+    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient, Precision(), Recall()])
 
     return model
 
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     modelArchFolder = f"dev"
 
-    model = uNetQ(batchShape=(4, 384, 384, 4))
+    model = BIGuNetQ(batchShape=(4, 384, 384, 4))
     model.summary()
     plot_model(model, to_file=f'{modelArchFolder}/model.pdf', show_shapes=True, show_layer_names=True)
     print('Model plotted and saved!')
