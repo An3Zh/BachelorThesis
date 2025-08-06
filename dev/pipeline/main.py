@@ -1,5 +1,5 @@
 from load import *  #buildDS, stitchPatches, getSceneGridSizes
-from model import uNetQ
+from model import *
 from convert import asBatchOne, ConvertToTflite, convertToEdge
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.utils import plot_model
@@ -8,13 +8,13 @@ import json
 import os
 
 
-batchSize         = 8
+batchSize         = 1
 imgSize           = (192,192)
-numEpochs         = 2
-modelArchitecture = uNetQ
-valRatio          = 0.1 
-trainValDSSize    = 5155
-numCalBatches     = 40
+numEpochs         = 1
+modelArchitecture = uNetNoConvBlockQ
+valRatio          = 0.2
+trainValDSSize    = 100
+numCalBatches     = 1
 
 (trainDS, valDS, trainSteps, 
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
