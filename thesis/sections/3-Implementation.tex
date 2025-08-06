@@ -110,16 +110,52 @@ After inference, the model's output patches can be passed to the \code{stitchPat
 \section{Model}
 
 The core building blocks and utility functions for architecting the model are organized in \code{model.py}.
-\glspl{cnn} are constructed using \gls{tf}'s built-in \glspl{api}, allowing for modular and reusable design.
+\gls{cnn} layers are constructed using \gls{tf}'s built-in \glspl{api}, allowing for modular and reusable design.
 
-To simplify architecture changes and streamline the process of constructing and loading different models,
-common pattern, such as convolutional block, is implemented in helper function \code{quantConvBlock}.
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{l X l l}
+\textbf{Model Name} & \textbf{Description} & \textbf{Parameters} & \textbf{Input Size} \\
+\hline
+BaseNet      & Minimal CNN for proof-of-concept; 2 conv layers, 1 dense & 300,000 & 192×192×4 \\
+MediumNet    & Deeper CNN; 4 conv, 2 dense, dropout, QAT-ready          & 2,000,000 & 192×192×4 \\
+LargeNet     & U-Net variant; skip connections, batch norm, QAT         & 30,000,000 & 192×192×4 \\
+\end{tabularx}
+\caption{Overview of Model Architectures Used in This Work}
+\label{tab:model-architectures}
+\end{table}
 
-During development, it was necessary to test multiple model architectures and sizes.
-Therefore, the implementation supports fast and compatible switching between different models using different architecture-building fuctions.
-For instance, \code{simpleModel} function compiles the pioneer simpliest \code{uNet} architecture used for proof of concept on \gls{edgetpu}.
 
-Below, a part from the \code{simpleModel} is illustrated as an example
+At early development stages, the model architecture \code{simple} was implemented.
+It served as proof-of-concept and was used for initial debugging of training and conversion pipeline as well as to get the first inference results on \gls{devboard}.
+The model was not annotaded for \gls{qat}.
+
+Below are examples of layers of two models, the left one is not annotaded for \gls{qat}, the right one is annotaded for \gls{qat}.
+As outlined in \secshortref{subsubsec:qat}, the \code{QuantizeWrapperV2} and \code{QuantizeLayer} \glspl{tfop} are inserted in the architecture,
+wrapping the base layers with quantization-dequantization operations.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPart.pdf}
+    \caption{Links}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPartQ.pdf}
+    \caption{Rechts}
+  \end{subfigure}
+  \caption{Zwei SVGs nebeneinander (als PDF)}
+\end{figure}
+
+
+It is important to emphasize, that the \code{BatchNormalization} \gls{tfop} is inserted after \code{Conv2D} and before \code{Activation} \glspl{tfop} \cite{batchnormActivation}.
+
+Later on, a more complex, already \code{uNet} architecture was implemented, already involving more, deeper layers and implementing skip connections.
+Early versions of this model architecture were not \gls{qat} annotaded, only \gls{ptq} was used at conversion time.
+Below 
 
 \code{uNet} model already represents the deep \code{uNet} architecture with \dots, model layers, however, are not annotaded for \gls{qat}.
 

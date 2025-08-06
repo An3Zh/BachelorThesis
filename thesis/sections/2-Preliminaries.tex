@@ -85,22 +85,35 @@ Instead, complete scene \gls{gt} masks are provided in the \code{Entire\_scene\_
 
 The examples of training patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location are shown below as normalized greyscale images: 
 
-\begin{figure}[H] %htbp
+\begin{figure}[H]
   \centering
-  \begin{tabular}{cccc}
-    \includegraphics[width=0.22\textwidth]{files/examples/red_patch.png}   &
-    \includegraphics[width=0.22\textwidth]{files/examples/green_patch.png} &
-    \includegraphics[width=0.22\textwidth]{files/examples/blue_patch.png}  &
-    \includegraphics[width=0.22\textwidth]{files/examples/nir_patch.png}   \\
-    (a) Red & (b) Green & (c) Blue & (d) NIR \\
-    \multicolumn{4}{c}{
-      \begin{tabular}{c}
-        \includegraphics[width=0.22\textwidth]{files/examples/gt_patch.png} \\
-        (e) Ground Truth
-      \end{tabular}
-    }
+  \begin{subfigure}[t]{0.22\textwidth}
+    \includegraphics[width=\linewidth]{files/examples/red_patch.png}
+    \caption{Red}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.22\textwidth}
+    \includegraphics[width=\linewidth]{files/examples/green_patch.png}
+    \caption{Green}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.22\textwidth}
+    \includegraphics[width=\linewidth]{files/examples/blue_patch.png}
+    \caption{Blue}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.22\textwidth}
+    \includegraphics[width=\linewidth]{files/examples/nir_patch.png}
+    \caption{NIR}
+  \end{subfigure}
 
-  \end{tabular}
+  \vspace{0.5em}
+
+  \begin{subfigure}[t]{0.22\textwidth}
+    \includegraphics[width=\linewidth]{files/examples/gt_patch.png}
+    \caption{Ground Truth}
+  \end{subfigure}
+
   \caption{Four spectral input patches and the corresponding ground truth mask.}
   \label{fig:patch_example}
 \end{figure}
@@ -259,6 +272,7 @@ To mitigate this, the model architecture can be adapted to perform \gls{qat} pri
 It should be clarified that model training can be performed using various numerical data types for model parameters; in this work, however, \gls{float32} is used.
 
 \subsubsection{Quantization-Aware Training}
+\label{subsubsec:qat}
 
 The model architecture is modified by inserting quantization-dequantization operations at the edges, and by applying them to weights, biases, and activations.
 In the forward pass, dequantization is applied immediately after quantization for each \gls{qat}-annotated \gls{float32} value.
