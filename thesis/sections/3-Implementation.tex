@@ -60,6 +60,7 @@ Because the datasets are repeated indefinitely, it is essential to define the nu
 These step counts are computed as follows: \ensuremath{trainSteps = trainSubsetSize / batchSize}, \ensuremath{valSteps = valSubsetSize / batchSize},
 and are used to ensure the correct number of iterations per epoch during training.
 
+\todo{adjust formula}
 \todo{maybe add code snippets}
 
 \subsection{Testing}
@@ -117,6 +118,9 @@ common pattern, such as convolutional block, is implemented in helper function \
 During development, it was necessary to test multiple model architectures and sizes.
 Therefore, the implementation supports fast and compatible switching between different models using different architecture-building fuctions.
 For instance, \code{simpleModel} function compiles the pioneer simpliest \code{uNet} architecture used for proof of concept on \gls{edgetpu}.
+
+Below, a part from the \code{simpleModel} is illustrated as an example
+
 \code{uNet} model already represents the deep \code{uNet} architecture with \dots, model layers, however, are not annotaded for \gls{qat}.
 
 \todo{explain different architecture functions here, maybe even all of them. Mention \gls{qat} annotation} 
@@ -128,7 +132,10 @@ These metrics include\dots
 
 \todo{mention binary crossentropy compared to softJaccardLoss! Maybe this in evaluation.}
 
+Below, are shown the examples of the parts of uNet \gls{cnn}
+
 \section{Training}
+\label{sec:training}
 
 The complete model training and conversion pipeline is implemented in the \code{main.py} file.
 
@@ -161,7 +168,7 @@ Once all configurations are saved, model training is initiated with the specifie
 
 Upon completion of training, the final model weights are saved and immediately used for model conversion.
 
-\subsubsection{Technical Setup}
+\subsection*{Technical Challenges}
 
 Training of initial proof-of-concept models was performed on a personal workstation equipped with an Intel Core i5-13400F CPU and an NVIDIA GeForce RTX 4060 GPU.
 To enable GPU acceleration for the \gls{tf} training process, the NVIDIA \gls{cuda} \gls{api} and the corresponding \gls{cudnn} library must be installed and configured.
@@ -172,14 +179,17 @@ Further details on these compatibility considerations are discussed in \secshort
 Initial models containing approximately 300,000 parameters were trained without \gls{qat} for tens of epochs.
 On the described setup and using the full training dataset, the time required for a single epoch was less than 15 seconds, which was deemed acceptable.
 
+\todo{double check parameters number}
+
 With the introduction of more complex models containing 2,000,000 and 30,000,000 parameters, and when employing \gls{qat}, training times increased significantly.
 For these larger models, one epoch on the full training dataset required approximately 3 minutes and 12 minutes, respectively.
 Since at least 100 epochs were necessary to achieve adequate model performance, more powerful hardware resources became essential.
 
-Thunder Compute, an American startup providing GPU cloud resources for machine learning and data science, was utilized for large-scale experiments.
+Thunder Compute, an American startup providing GPU cloud resources for machine learning and data science, was utilized for large-scale experiments \cite{thundercompute}.
 By using an instance with an NVIDIA A100XL GPU, training times for the 2,000,000 parameter network were reduced to approximately 20 seconds per epoch,
 and for the 30,000,000 parameter network to 40 seconds per epoch.
-A \ensuremath{10\times} increase in GPU memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes, resulting in more effective training and improved model robustness.
+A \ensuremath{10\times} increase in GPU memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes,
+resulting in more effective training and improved model robustness.
 
 However, significant effort was required to configure the cloud instance for compatibility.
 The more expensive production mode had to be used, as the prototyping mode did not allow downgrading \gls{cuda} and \gls{cudnn} versions \cite{thundercomputeProtProd}.
@@ -192,13 +202,36 @@ As a result, an improvement is planned that will allow passing the desired \gls{
 \section{Conversion}
 \label{sec:conversion}
 
-In order to convert the model after training to the Edge TPU format and to perform PTQ with calibration, several helper functions are defined in convert.py. As mentioned in [], the Edge TPU only supports models with a batch size of one. Howerver, for effective training, it is necessary to use and experiment with different batch sizes. Therefore, as the first step in the conversion process, the asBatchOne function transfers the trained weights to a new model with the exact same architecture but with an input batch size of one.
+The file \code{convert.py} contains all necessary functions and utilities for model conversion and \gls{edgetpu} compilation.
+These functions are called from \code{main.py} immediately after training is complete.
 
-Next, using TensorFlow's TFLiteConverter, the model is converted to the .tflite format, which is specifically desinged for compact deployment on mobile or edge devices. During this conversion, calibration <TODO explain in concept> is performed using a representative dataset, typically consisting of numerous patches from the training dataset. Furthermore, the inputs and outputs of the converted model are set to int8 for quantized inference.
+As outlined in \secshortref{subsec:hardware}, the \gls{edgetpu} supports input tensors with at most three dimensions.
+This necessitates the use of batch size one, since the input tensor shape is already \ensuremath{image~height~\times~image~width~\times~number~of~channels}.
+During training, larger batch sizes are typically used for efficiency.
+Therefore, after training, the function \code{asBatchOne} is used to transfer the trained weights to a model with identical architecture,
+but with batch size set to one for the input, all intermediate computations, and the output.
 
-As the final step, the model is compiled for Edge TPU inference using the provided edgetpu-compiler (link). After successful compilation, all ops (explain what it is) in the model are ideally converted into a single Edge TPU custon op ready for deployment. If the compiler cannot map a certain op to the Edge TPU, it will be mapped to the CPU instead, which can significantly increase inference time. The goal of this thesis is to meet all model requirements for Edge TPU [chapter with requirements] and ensure that all ops are mapped to it. The aspired final model conversion result is illustrated below.
+The \code{tf.lite.TFLiteConverter} utility is then used to perform \gls{ptq} and convert the model to
+the \code{.tflite} format\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/lite/TFLiteConverter}}.
+A representative dataset is generated using the \code{representativeDatasetGen} function, consisting of training \gls{rgb} and \gls{nir} patches.
+The number of calibration batches used can be adjusted via \code{numCalBatches}, as defined in \secshortref{sec:training}.
+The greater the amount of calibration data, the more likely the observed value range will closely match the inference data, improving quantization accuracy.
 
-\todo{TODO put netron.app with before and after compile. Describe it in text. Mention netron! Look out for other todos in text above!}
+Next, all supported \glspl{tfop} are quantized, and model inputs and outputs are quantized as well.
+While various data types can be used for quantization, only \gls{int8} or \gls{uint8} are used in this work, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
+The quantized model is then saved, and the \gls{edgetpu} compiler is invoked.
+
+Since training may be performed either on a local Windows machine or on a Linux-based cloud GPU instance from Thunder Compute,
+cross-platform automation of the pipeline is ensured by using helper functions and platform detection before invoking the \gls{edgetpu} compiler.
+Because the \gls{edgetpu} compiler can only run on Debian-based Linux systems, the Windows Subsystem for Linux (WSL) is used when working on a Windows machine.
+
+The final result is the \code{quant\_edgetpu.tflite} file --- a quantized, \gls{edgetpu}-compatible model ready for inference.
+
+\subsection*{Technical Challenges}
+
+
+
+\todo{Add Netron.app screenshots before and after compilation. Describe and discuss Netron visualizations here. Check for other TODOs above.}
 
 \section{Deployment}
 \label{sec:deployment}

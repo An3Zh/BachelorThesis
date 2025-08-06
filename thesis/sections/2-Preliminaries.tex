@@ -155,33 +155,6 @@ An example scene is shown below as a false-color composite:
   \label{fig:false_color_scene}
 \end{figure}
 
-\subsection{Hardware}
-\label{subsec:hardware}
-
-Running machine learning inference on embedded systems is referred to as edge inference. The Coral dev Board Mini, developed by Google, is a compact single-board computer designed for such edge AI applications. It features quad-core MediaTek 8167s System-on-a-Chip (SoC) on the Armv8-A architecture, along with a dedicated Edge TPU – a hardware accelerator optimized for executing TensorFlow Lite models using 8-bit integer operations.
-
-The Edge TPU delivers up to 4 trillion operations per second (TOPS) of performance while consuming only around 2 watts of power, making it ideal for use in resource-constrained environments such as satellites, where energy efficiency and reliability are crucial.
-
-To deploy a model on Edge TPU, it must meet the following requirements:
-\begin{itemize}
-    \item Tensor parameters quantized
-    \item Tensor sizes are constant at compile-time
-    \item Model parameters (such as bias tensors) are constant at compile-time
-    \item Tensors are either 1-, 2-, or 3-dimensional. If a tensor has more than 3 dimensions, then only the 3 innermost dimensions may have a size greater than 1.
-    \item The model uses only the operations supported by the Edge TPU (see table 1 below). \todo{CROP the table to only relevant commands and paste it}
-\end{itemize}
-
-These requirements directly affect model architecture, training strategy, and tooling. For instance, certain operations unsopported by Edge TPU must be avoided, and quantization aware training or post-training quantization must be considered early in the development process.
-
-The following image from Coral documentation summarizes the model conversion and deployment workflow.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{files/Edge_TPU_quantization.png}
-  \caption{The basic workflow to create a model for the Edge TPU}
-  \label{fig:quantization-chart}
-\end{figure}
-
 \subsection{Quantization}
 \label{subsec:quantization}
 
@@ -322,6 +295,38 @@ The observed extrema are then used to set the quantization parameters for every 
 This trade-off maximally reduces model size and enables highly efficient inference using integer-only arithmetic.
 \end{itemize}
 
+\subsection{Hardware}
+\label{subsec:hardware}
+
+Running machine learning inference on embedded systems is referred to as edge inference.
+The Coral dev Board Mini, developed by Google, is a compact single-board computer designed for such edge AI applications.
+It features quad-core MediaTek 8167s System-on-a-Chip (SoC) on the Armv8-A architecture,
+along with a dedicated Edge TPU --- a hardware accelerator optimized for executing TensorFlow Lite models using 8-bit integer operations.
+
+The Edge TPU delivers up to 4 trillion operations per second (TOPS) of performance while consuming only around 2 watts of power,
+making it ideal for use in resource-constrained environments such as satellites, where energy efficiency and reliability are crucial.
+
+To deploy a model on Edge TPU, it must meet the following requirements:
+\begin{itemize}
+    \item Tensor parameters quantized in \gls{int8} or \gls{uint8}
+    \item Tensor sizes are constant at compile-time
+    \item Model parameters (such as bias tensors) are constant at compile-time
+    \item Tensors are either 1-, 2-, or 3-dimensional. If a tensor has more than 3 dimensions, then only the 3 innermost dimensions may have a size greater than 1.
+    \item The model uses only the operations supported by the Edge TPU (see table 1 below). \todo{CROP the table to only relevant commands and paste it}
+\end{itemize}
+
+These requirements directly affect model architecture, training strategy, and tooling. For instance, certain operations unsopported by Edge TPU must be avoided,
+and quantization aware training or post-training quantization must be considered early in the development process.
+
+The following image from Coral documentation summarizes the model conversion and deployment workflow.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{files/Edge_TPU_quantization.png}
+  \caption{The basic workflow to create a model for the Edge TPU}
+  \label{fig:quantization-chart}
+\end{figure}
+
 \section{Design}
 
 \subsection{Data}
@@ -351,7 +356,29 @@ allowing convenient switching between models during training.
 %For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
 
 \subsection{Training}
+\label{subsec:designtrain}
+
+After implementing utilities for dataset construction and defining the model architecture, the next step is to develop the training pipeline.
+Initially, a simple and direct training pipeline should be created to validate basic model architectures, as a minimal setup both reduces potential error sources and enables rapid proof-of-concept.
+During early development, model conversion is performed separately after training, before deployment.
+
+However, the pipeline should be further refined, ideally as a single executable script, that encompasses data loading, training, configuration management, and model conversion,
+streamlining the path to deployment. The goal is to enable a convenient, one-click training and conversion workflow.
+
+To ensure reproducibility and facilitate backups, it is important to store all training configurations, logs, and intermediate model weights for each run.
+
+Finally, computational resources must be considered. To avoid prohibitively long training times, the use of more powerful machines or cloud-based resources should be evaluated.
+
 \subsection{Conversion}
+
+After training, the model must be converted and compiled for \gls{edgetpu} inference.
+A modular approach is important here as well, simplifying debugging and ensuring correct conversion and compilation during early development.
+Later, as described in \secshortref{subsec:designtrain}, integration of the conversion process directly into the training pipeline is ideal for convenience and efficiency.
+
+Automation of the \gls{edgetpu} compiler,
+provided by Google\footnote{\url{https://coral.ai/docs/edgetpu/compiler/}},
+is required so that the entire training and conversion pipeline outputs a model ready for deployment on the \gls{devboard}.
+
 \subsection{Deployment}
 \subsection{Evaluation}
 I wanna first conveniently have training, validation and test datasets ready for efficient TF training.
