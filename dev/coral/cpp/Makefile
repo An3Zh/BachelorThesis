@@ -46,26 +46,27 @@ LIBS := \
   lib/libabsl_hash.a \
   lib/libabsl_city.a
 
-# Specify your source files for each program
+# Source files
 STITCH_SRC    := src/stitch.cpp
 INFERENCE_SRC := src/inference.cpp
 
+# Targets
 STITCH_TARGET    := build/stitch
 INFERENCE_TARGET := build/inference
 
 all: $(STITCH_TARGET) $(INFERENCE_TARGET)
 
-$(STITCH_TARGET): $(STITCH_SRC)
+$(INFERENCE_TARGET): $(INFERENCE_SRC)
 	$(CXX) $(CXXFLAGS) $^ $(LIBS) $(LDFLAGS) -o $@
 
-$(INFERENCE_TARGET): $(INFERENCE_SRC)
+$(STITCH_TARGET): $(STITCH_SRC)
 	$(CXX) $(CXXFLAGS) $^ $(LIBS) $(LDFLAGS) -o $@
 
 clean:
 	rm -f $(STITCH_TARGET) $(INFERENCE_TARGET)
 
 run-stitch: $(STITCH_TARGET)
-	./build/stitch /home/mendel/BA/dev/coral/shared/patches/scene_34033_output 34033 192 192 /home/mendel/BA/dev/coral/shared/patches/sceneTest.bin
+	./build/stitch
 
 run-inference: $(INFERENCE_TARGET)
 	./build/inference
