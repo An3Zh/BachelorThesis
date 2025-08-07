@@ -50,7 +50,6 @@ lib
 python
 build
 edgetpu_results
-scripts
 testdata
 thesis/files
 *.code-workspace
