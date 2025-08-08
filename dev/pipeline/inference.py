@@ -19,7 +19,7 @@ imgSize       = (192,192)
 singleSceneID = 3052
 Upsample      = imgSize is not None  # <-- 🔧 your new flag
 BaseFolder    = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
-runFolder     = BaseFolder / "run_20250806_171557"
+runFolder     = BaseFolder / "run_20250719_170647"
 modelPath     = runFolder  / "endModel.h5"
 saveFolder    = runFolder  / "evaluation\inference"
 

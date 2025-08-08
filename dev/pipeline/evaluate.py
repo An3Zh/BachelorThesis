@@ -1,168 +1,141 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import precision_recall_curve
-from PIL import Image
-import numpy as np
-import os
+import re
+import csv
 from pathlib import Path
+import numpy as np
+from PIL import Image
+from sklearn.metrics import precision_recall_curve, confusion_matrix
 
-def computeMetrics(gtMask, predMask):
-    assert gtMask.shape == predMask.shape, "Masks must have same shape"
-    gt = gtMask.astype(bool)
-    pred = predMask.astype(bool)
+from load import getSceneGridSizes
 
-    # Confusion
-    tp = np.logical_and(pred, gt).sum()
-    tn = np.logical_and(~pred, ~gt).sum()           
-    fp = np.logical_and(pred, ~gt).sum()
-    fn = np.logical_and(~pred, gt).sum()
+def getSceneId(path: Path):
+    m = re.search(r"scene_(\d+)\.npy$", path.name)
+    return int(m.group(1)) if m else None
 
-    # IoU
-    iou = tp / (tp + fp + fn + 1e-6)
-    # Dice
-    dice = 2 * tp / (2 * tp + fp + fn + 1e-6)
-    # Precision
-    precision = tp / (tp + fp + 1e-6)
-    # Recall
-    recall = tp / (tp + fn + 1e-6)
-    # Accuracy (if you want)
-    accuracy = (tp + tn) / (tp + tn + fp + fn + 1e-6)
+def findGt(gtBase: Path, sceneId: int):
+    return next(iter(gtBase.glob(f"**/*_{sceneId:06d}_*.TIF")), None)
 
-    print(f"IoU (Jaccard):   {iou:.4f}")
-    print(f"Dice (F1):       {dice:.4f}")
-    print(f"Precision:       {precision:.4f}")
-    print(f"Recall:          {recall:.4f}")
-    print(f"Accuracy:        {accuracy:.4f}")
+def loadGtMask(gtPath: Path):
+    gt = np.array(Image.open(gtPath), dtype=np.uint8)
+    return (gt > 0).astype(np.uint8)
 
-    return dict(iou=iou, dice=dice, precision=precision, recall=recall, accuracy=accuracy)
 
-def evaluatePRC(yTrueArray: np.ndarray, yPredArray: np.ndarray, showPlot: bool = True):
-    """
-    Evaluates precision, recall, F1 score across thresholds using PRC.
-    Expects:
-      - yTrueArray: binary ground truth masks, shape [N, H, W]
-      - yPredArray: predicted probability masks, shape [N, H, W]
+def ensureDirs(evalDir: Path):
+    infDir = evalDir / "inference"
+    unpDir = evalDir / "unpadded"
+    binDir = evalDir / "binarized"
+    unpDir.mkdir(parents=True, exist_ok=True)
+    binDir.mkdir(parents=True, exist_ok=True)
+    return infDir, unpDir, binDir
 
-    Returns:
-      - bestThreshold: float
-      - bestF1: float
-    """
-    yTrueFlat = yTrueArray.flatten()
-    yPredFlat = yPredArray.flatten()
+# ---- helpers ----
 
-    precisions, recalls, thresholds = precision_recall_curve(yTrueFlat, yPredFlat)
-    f1s = 2 * (precisions * recalls) / (precisions + recalls + 1e-6)
-    bestIdx = np.argmax(f1s)
-    bestThreshold = thresholds[bestIdx]
-    bestF1 = f1s[bestIdx]
+def unpadToMatch(pred, gt):
+    ph, pw = pred.shape
+    gh, gw = gt.shape
+    y0 = (ph - gh) // 2
+    x0 = (pw - gw) // 2
+    return pred[y0:y0 + gh, x0:x0 + gw]
 
-    print(f"✅ Best threshold: {bestThreshold:.3f}")
-    print(f"📈 Precision: {precisions[bestIdx]:.3f}, Recall: {recalls[bestIdx]:.3f}, F1 Score: {bestF1:.3f}")
+def evaluatePRC(gtBatch, predBatch, showPlot=True):
+    y_true = gtBatch.flatten()
+    y_scores = predBatch.flatten()
+    precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
+    f1_scores = 2 * precision * recall / (precision + recall + 1e-8)
+    best_idx = np.argmax(f1_scores)
+    return thresholds[best_idx], f1_scores[best_idx]
 
-    if showPlot:
-        plt.figure(figsize=(8,6))
-        plt.plot(recalls, precisions, label="PR Curve")
-        plt.scatter(recalls[bestIdx], precisions[bestIdx], c="red", label=f"Best F1 = {bestF1:.2f}")
-        plt.xlabel("Recall")
-        plt.ylabel("Precision")
-        plt.title("Precision-Recall Curve")
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.show()
 
-    return bestThreshold, bestF1
 
-def unpadToMatch(predMask: np.ndarray, gtMask: np.ndarray) -> np.ndarray:
-    """
-    Crops predMask from the center using floor-based cropping to match gtMask.
-    Handles odd differences like the MATLAB 'unzeropad' function.
-    """
-    predH, predW = predMask.shape
-    gtH, gtW = gtMask.shape
+def computeMetrics(gt, predBin):
+    tn, fp, fn, tp = confusion_matrix(gt.flatten(), predBin.flatten(), labels=[0, 1]).ravel()
+    iou = tp / (tp + fp + fn + 1e-8)
+    dice = (2 * tp) / (2 * tp + fp + fn + 1e-8)
+    precision = tp / (tp + fp + 1e-8)
+    recall = tp / (tp + fn + 1e-8)
+    accuracy = (tp + tn) / (tp + tn + fp + fn + 1e-8)
+    return {"iou": iou, "dice": dice, "precision": precision, "recall": recall, "accuracy": accuracy}
 
-    diffH = predH - gtH
-    diffW = predW - gtW
 
-    if diffH < 0 or diffW < 0:
-        raise ValueError(f"GT mask is larger than prediction. Cannot crop safely: pred={predMask.shape}, gt={gtMask.shape}")
+def savePngGray(path: Path, arr: np.ndarray) -> None:
+    img = (np.clip(arr, 0, 1) * 255).astype(np.uint8)
+    Image.fromarray(img).save(path)
 
-    top = diffH // 2
-    left = diffW // 2
 
-    return predMask[top:top + gtH, left:left + gtW]
+def savePngBinary(path: Path, mask: np.ndarray) -> None:
+    img = (mask.astype(np.uint8) * 255)
+    Image.fromarray(img).save(path)
 
-def overlayPredictionVsGT(gt: np.ndarray, pred: np.ndarray, alpha=0.5):
-    """
-    Displays an overlay of GT (red) vs prediction (green). White = match, other colors = mismatch.
-    """
-    if gt.shape != pred.shape:
-        raise ValueError(f"Shape mismatch! GT: {gt.shape}, Pred: {pred.shape}")
 
-    overlay = np.zeros((gt.shape[0], gt.shape[1], 3), dtype=np.float32)
+# --- main evaluation ---
 
-    # GT = red channel, Pred = green channel
-    overlay[..., 0] = gt     # Red
-    overlay[..., 1] = pred   # Green
+def evaluateAll(runDir: Path, gtBase: Path):
+    evalDir = runDir / "evaluation"
+    infDir, unpDir, binDir = ensureDirs(evalDir)
+    grid = getSceneGridSizes()
 
-    plt.figure(figsize=(12, 12))
-    plt.title("Overlay — GT (Red) vs Prediction (Green)")
-    plt.imshow(overlay)
-    plt.axis('off')
-    plt.show()
+    files = sorted(infDir.glob("scene_*.npy"))
+    if not files:
+        print(f"No inference files in {infDir}")
+        return
+
+    csvPath = evalDir / "metrics.csv"
+    with open(csvPath, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["sceneId", "bestThreshold", "bestF1", "iou", "dice", "precision", "recall", "accuracy"],
+        )
+        writer.writeheader()
+
+        for p in files:
+            sceneId = getSceneId(p)
+            if sceneId is None or sceneId not in grid:
+                print(f"skip {p.name}")
+                continue
+
+            gtPath = findGt(gtBase, sceneId)
+            if gtPath is None:
+                print(f"no GT for {sceneId}")
+                continue
+
+            pred = np.load(p)
+            if pred.ndim != 2:
+                pred = np.squeeze(pred)
+            gt = loadGtMask(gtPath)
+
+            # Unpad and save NPY + PNG
+            predUnp = unpadToMatch(pred, gt)
+            unpNpy = unpDir / f"unpadded_scene_{sceneId}.npy"
+            np.save(unpNpy, predUnp)
+            savePngGray(unpNpy.with_suffix(".png"), predUnp)
+
+            # PRC → binarize and save NPY + PNG
+            thr, f1 = evaluatePRC(gt[np.newaxis, ...], predUnp[np.newaxis, ...], showPlot=False)
+            binMask = (predUnp >= thr).astype(np.uint8)
+            binNpy = binDir / f"binmask_scene_{sceneId}.npy"
+            np.save(binNpy, binMask)
+            savePngBinary(binNpy.with_suffix(".png"), binMask)
+
+            # Metrics
+            m = computeMetrics(gt, binMask)
+            writer.writerow({
+                "sceneId": sceneId,
+                "bestThreshold": f"{thr:.6f}",
+                "bestF1": f"{f1:.6f}",
+                **{k: f"{v:.6f}" for k, v in m.items()},
+            })
+
+            print(
+                f"scene {sceneId} → τ={thr:.4f}, F1={f1:.4f}, "
+                f"IoU={m['iou']:.4f}, Dice={m['dice']:.4f}, "
+                f"Precision={m['precision']:.4f}, Recall={m['recall']:.4f}, Accuracy={m['accuracy']:.4f}"
+            )
+
+    print(f"done → {csvPath}")
+
 
 if __name__ == "__main__":
-
-    # 🔧 CONFIGURE THESE
-    sceneId = "3052"
-    predPath = fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\scene_{sceneId}.npy"
-    gtPath = fr"C:\Users\andre\Documents\BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts\edited_corrected_gts_LC08_L1TP_003052_20160120_20170405_01_T1.TIF"
-    savePath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\unpadded_scene_{sceneId}")
-    overlaySavePath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\overlay_scene_{sceneId}.png")
-
-#   📥 Load prediction and GT
-#   pred = np.load(predPath)
-#   gt = np.array(Image.open(gtPath), dtype=np.uint8)
-#
-#   print("Loaded:")
-#   print(f"  Prediction shape: {pred.shape}")
-#   print(f"  GT shape:         {gt.shape}")
-#
-#   # ✂️ Unpad
-#   cropped = unpadToMatch(pred, gt)
-#   print(f"Unpadded prediction shape: {cropped.shape}")
-#
-#   # 💾 Save cropped result
-#   np.save(savePath.with_suffix(".npy"), cropped)
-#   img = (cropped * 255).clip(0, 255).astype(np.uint8) if cropped.dtype != np.uint8 else cropped
-#   Image.fromarray(img).save(savePath.with_suffix(".png"))
-#   print(f"✅ Unpadded prediction saved to: {savePath}")
-
-
-#   predPath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\unpadded_scene_{sceneId}.npy")
-#   saveNpyPath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\binmask_scene_{sceneId}.npy")
-#   savePngPath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\binmask_scene_{sceneId}.png")
-#
-#   pred = np.load(predPath)
-    gt = np.array(Image.open(gtPath), dtype=np.uint8)
-#   bestThreshold, bestF1 = evaluatePRC(gt, pred, showPlot=True)
-#
-#   binarizedMask = (pred >= bestThreshold).astype(np.uint8)
-#   np.save(saveNpyPath, binarizedMask)
-#   Image.fromarray(binarizedMask * 255).save(savePngPath)
-
-    binmaskPath = Path(fr"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes\unpadded\binmask_scene_{sceneId}.npy")
-    binmask = np.load(binmaskPath)
-
-    
-    metrics = computeMetrics(gt, binmask)
-
-
-#🔍 Overlay GT vs Prediction, SAVE DIRECTLY (NO plt)
-#   overlay = np.zeros((gt.shape[0], gt.shape[1], 3), dtype=np.uint8)
-#   overlay[..., 0] = gt * 255        # Red
-#   overlay[..., 1] = cropped * 255   # Green
-#   # overlay[..., 2] stays 0 (blue)
-
-#   Image.fromarray(overlay).save(overlaySavePath)
-#   print(f"✅ Overlay image saved to: {overlaySavePath}")
+    BaseFolder = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
+    runDir = BaseFolder / "run_20250719_170647"
+    # raw strings cannot end with a single backslash → drop it
+    gtBase = Path(r"C:\Users\andre\Documents\BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts")
+    evaluateAll(runDir, gtBase)
