@@ -182,18 +182,17 @@ def buildDS(
     return trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID
     
 def stitchPatches(yPred: np.ndarray, singleSceneID: int = None):
-
-    outputDir = Path(r"C:\Users\andre\Documents\BA\dev\pipeline\results\scenes")
-    outputDir.mkdir(parents=True, exist_ok=True)
+    
     sceneGridSizes = getSceneGridSizes()
     scenesToProcess = (
         {singleSceneID: sceneGridSizes[singleSceneID]} if singleSceneID is not None
-        else sceneGridSizes)
+        else sceneGridSizes
+    )
+
     stitchedScenes = {}
     i = 0
 
     for sceneId, (cols, rows) in scenesToProcess.items():
-
         patchH, patchW = yPred[i].shape
         canvas = np.zeros((rows * patchH, cols * patchW), dtype=yPred[i].dtype)
 
@@ -211,20 +210,6 @@ def stitchPatches(yPred: np.ndarray, singleSceneID: int = None):
 
         stitchedScenes[sceneId] = canvas
 
-        imgPath = outputDir / f"scene_{sceneId}.png"
-        npyPath = outputDir / f"scene_{sceneId}.npy"
-
-        np.save(npyPath, canvas)
-
-        if canvas.dtype != np.uint8:
-            img = (canvas * 255).clip(0, 255).astype(np.uint8)
-        else:
-            img = canvas
-
-        Image.fromarray(img).save(imgPath)
-
-        print(f"✅ Scene {sceneId} stitched and saved → {imgPath.name}")
-        
     return stitchedScenes
 
 if __name__ == "__main__":
