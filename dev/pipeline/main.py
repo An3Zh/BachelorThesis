@@ -6,12 +6,16 @@ from tensorflow.keras.utils import plot_model
 import shutil, datetime
 import json
 import os
+import numpy as np
+import tensorflow as tf
+from evaluate import evaluatePRC
+from pathlib import Path
 
 
-batchSize         = 1
+batchSize         = 4
 imgSize           = (192,192)
 numEpochs         = 1
-modelArchitecture = uNetNoConvBlockQ
+modelArchitecture = simpleQ
 valRatio          = 0.2
 trainValDSSize    = 100
 numCalBatches     = 1
@@ -64,6 +68,24 @@ print('-' * 40)
 
 with open(f'{runFolder}/training_history.json', "w") as f:
     json.dump(historyuNet.history, f, indent=4, default=str)
+
+# --- PRC on validation (pooled pixels) ---
+yScoresList, yTrueList = [], []
+for xBatch, gtBatch in valDS.take(valSteps):     # valDS is repeated → limit by valSteps
+    yPred = model(xBatch, training=False)        # [B,H,W,1], sigmoid outputs
+    yScoresList.append(tf.squeeze(yPred, -1).numpy())  # [B,H,W]
+    yTrueList.append(gtBatch.numpy())                    # [B,H,W]
+
+yScores = np.concatenate(yScoresList, axis=0)    # [N,H,W]
+yTrue   = np.concatenate(yTrueList,   axis=0)    # [N,H,W]
+
+plotPath = Path(runFolder) / "val_prc.png"
+bestThr, bestF1 = evaluatePRC(yTrue, yScores, showPlot=False, savePlotPath=plotPath, title="Validation PRC (pooled pixels)")
+
+with open(f'{runFolder}/val_threshold.json', "w") as f:
+    json.dump({"best_threshold": float(bestThr), "best_f1": float(bestF1)}, f, indent=2)
+
+print(f"Validation PRC → τ* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_threshold.json)")
 
 model = asBatchOne(model, modelArchitecture, imgSize)
 model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)

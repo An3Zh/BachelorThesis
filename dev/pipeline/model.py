@@ -247,6 +247,36 @@ def quantConvBlock(x, filters, kernelSize=3, activation='relu', name=None):
     x = Activation(activation, name=f"{name}_act2" if name else None)(x)
     return x
 
+def simpleQ(batchShape, filters=32):
+    inputs = Input(batch_shape=batchShape)
+
+    # Encoder (1 block)
+    c1 = quantConvBlock(inputs, filters, name="enc1")
+    p1 = MaxPooling2D((2, 2), name="pool1")(c1)
+
+    # Bottleneck
+    b = quantConvBlock(p1, filters * 2, name="bottleneck")
+
+    # Decoder (1 up block)
+    u1 = quantize_annotate_layer(
+        Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same', name="up1")
+    )(b)
+    u1 = Concatenate(name="concat1")([u1, c1])
+    d1 = quantConvBlock(u1, filters, name="dec1")
+
+    outputs = quantize_annotate_layer(
+        Conv2D(1, (1, 1), activation='sigmoid', name="output")
+    )(d1)
+
+    model = Model(inputs, outputs)
+    model = quantize_apply(model)
+    model.compile(
+        optimizer='adam',
+        loss='binary_crossentropy',
+        metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient, Precision(), Recall()]
+    )
+    return model
+
 def BIGuNetQ(batchShape, filters=32):
     inputs = Input(batch_shape=batchShape)
 

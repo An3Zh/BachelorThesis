@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from sklearn.metrics import precision_recall_curve, confusion_matrix
+from matplotlib import pyplot as plt
 
 from load import getSceneGridSizes
 
@@ -36,13 +37,28 @@ def unpadToMatch(pred, gt):
     x0 = (pw - gw) // 2
     return pred[y0:y0 + gh, x0:x0 + gw]
 
-def evaluatePRC(gtBatch, predBatch, showPlot=True):
+def evaluatePRC(gtBatch, predBatch, showPlot=False, savePlotPath: Path = None, title: str = None):
     y_true = gtBatch.flatten()
     y_scores = predBatch.flatten()
     precision, recall, thresholds = precision_recall_curve(y_true, y_scores)
     f1_scores = 2 * precision * recall / (precision + recall + 1e-8)
     best_idx = np.argmax(f1_scores)
-    return thresholds[best_idx], f1_scores[best_idx]
+    best_thr, best_f1 = thresholds[best_idx], f1_scores[best_idx]
+
+    if showPlot or savePlotPath is not None:
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.plot(recall, precision, label="PR curve")
+        ax.scatter(recall[best_idx], precision[best_idx], c="r", s=40, zorder=3, label=f"Best F1={best_f1:.3f}")
+        ax.set_xlabel("Recall")
+        ax.set_ylabel("Precision")
+        ax.set_title(title or "Precision–Recall Curve")
+        ax.grid(True, ls="--", alpha=0.3)
+        ax.legend(loc="lower left")
+        if savePlotPath is not None:
+            fig.savefig(savePlotPath, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+
+    return best_thr, best_f1
 
 
 
@@ -68,7 +84,7 @@ def savePngBinary(path: Path, mask: np.ndarray) -> None:
 
 # --- main evaluation ---
 
-def evaluateAll(runDir: Path, gtBase: Path):
+def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
     evalDir = runDir / "evaluation"
     infDir, unpDir, binDir = ensureDirs(evalDir)
     grid = getSceneGridSizes()
@@ -102,14 +118,20 @@ def evaluateAll(runDir: Path, gtBase: Path):
                 pred = np.squeeze(pred)
             gt = loadGtMask(gtPath)
 
-            # Unpad and save NPY + PNG
+            # Unpad
             predUnp = unpadToMatch(pred, gt)
             unpNpy = unpDir / f"unpadded_scene_{sceneId}.npy"
             np.save(unpNpy, predUnp)
             savePngGray(unpNpy.with_suffix(".png"), predUnp)
 
-            # PRC → binarize and save NPY + PNG
-            thr, f1 = evaluatePRC(gt[np.newaxis, ...], predUnp[np.newaxis, ...], showPlot=False)
+            # Threshold selection
+            if fixedThreshold is not None:
+                thr = fixedThreshold
+                f1 = None
+            else:
+                thr, f1 = evaluatePRC(gt[np.newaxis, ...], predUnp[np.newaxis, ...], showPlot=False)
+
+            # Binarize
             binMask = (predUnp >= thr).astype(np.uint8)
             binNpy = binDir / f"binmask_scene_{sceneId}.npy"
             np.save(binNpy, binMask)
@@ -120,12 +142,13 @@ def evaluateAll(runDir: Path, gtBase: Path):
             writer.writerow({
                 "sceneId": sceneId,
                 "bestThreshold": f"{thr:.6f}",
-                "bestF1": f"{f1:.6f}",
+                "bestF1": "" if f1 is None else f"{f1:.6f}",
                 **{k: f"{v:.6f}" for k, v in m.items()},
             })
 
+            f1_str = f", F1={f1:.4f}" if f1 is not None else ""
             print(
-                f"scene {sceneId} → τ={thr:.4f}, F1={f1:.4f}, "
+                f"scene {sceneId} → τ={thr:.4f}{f1_str}, "
                 f"IoU={m['iou']:.4f}, Dice={m['dice']:.4f}, "
                 f"Precision={m['precision']:.4f}, Recall={m['recall']:.4f}, Accuracy={m['accuracy']:.4f}"
             )
@@ -138,4 +161,4 @@ if __name__ == "__main__":
     runDir = BaseFolder / "run_20250719_170647"
     # raw strings cannot end with a single backslash → drop it
     gtBase = Path(r"C:\Users\andre\Documents\BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts")
-    evaluateAll(runDir, gtBase)
+    evaluateAll(runDir, gtBase, fixedThreshold=0.5421)
