@@ -93,8 +93,12 @@ def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
     if not files:
         print(f"No inference files in {infDir}")
         return
+    
+    if fixedThreshold is not None:
+        csvPath = evalDir / "metricsValThr.csv"
+    else:
+        csvPath = evalDir / "metricsTestThr.csv"
 
-    csvPath = evalDir / "metrics.csv"
     with open(csvPath, "w", newline="") as f:
         writer = csv.DictWriter(
             f,
@@ -157,8 +161,8 @@ def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
 
 
 if __name__ == "__main__":
-    BaseFolder = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
+    BaseFolder = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
     runDir = BaseFolder / "run_20250719_170647"
     # raw strings cannot end with a single backslash → drop it
-    gtBase = Path(r"C:\Users\andre\Documents\BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts")
-    evaluateAll(runDir, gtBase, fixedThreshold=0.5421)
+    gtBase = Path(r"C:\Users\aleks\Documents\An3BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts")
+    evaluateAll(runDir, gtBase)#, fixedThreshold=0.27384504675865173)

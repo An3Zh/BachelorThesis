@@ -2,7 +2,6 @@ from load import buildDS, stitchPatches, getSceneGridSizes
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 import numpy as np
-from matplotlib import pyplot as plt
 from tqdm import tqdm
 import math
 import time
@@ -14,32 +13,25 @@ from PIL import Image
 from pathlib import Path
 
 # --- Config ---
-batchSize     = 1
-imgSize       = (192,192)
-singleSceneID = 3052
-Upsample      = imgSize is not None  # <-- 🔧 your new flag
-BaseFolder    = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
+batchSize     = 16
+imgSize       = (192, 192)
+singleSceneID = None            # None → full test set (all scenes)
+Upsample      = imgSize is not None           # set True if you want per-patch upsampling
+BaseFolder    = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
 runFolder     = BaseFolder / "run_20250719_170647"
-modelPath     = runFolder  / "endModel.h5"
-saveFolder    = runFolder  / "evaluation\inference"
+modelPath     = runFolder / "endModel.h5"
+saveFolder    = runFolder / "evaluation" / "inference"
 
-# --- Load Data ---
-(trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
+# --- Load Data (testDS only used when singleSceneID is not None) ---
+(_, _, _, _, testDS, singleSceneID_loaded) = buildDS(
     includeTestDS=True,
     batchSize=batchSize,
     imgSize=imgSize,
-    singleSceneID=singleSceneID  # 0 for random
+    singleSceneID=singleSceneID  # 0 for random single scene, None for full dataset
 )
 
-# --- Prepare Inference, Define Size ---
-sceneGridSizes = getSceneGridSizes()    
-if singleSceneID is not None:
-    cols, rows = sceneGridSizes[singleSceneID]
-    total = math.ceil((cols * rows) / batchSize)
-    print(f"🧩 Inference for Scene {singleSceneID} ({cols}×{rows} patches)")
-else:
-    total = math.ceil(9201 / batchSize)
-    print("🧩 Inference for full test set")
+# --- Scene metadata ---
+sceneGridSizes = getSceneGridSizes()
 
 # --- Load Model ---
 with quantize_scope():
@@ -49,42 +41,49 @@ with quantize_scope():
                         'diceCoefficient': diceCoefficient}
     )
 
-# --- Run Inference ---
-predictions = []
-start = time.time()
-for xBatch, _ in tqdm(testDS, total=total):
-    yPred = model(xBatch)  # shape: [B, H, W, 1]
-    predictions.extend([p.numpy() for p in tf.unstack(yPred)])
-print(f"⏱️ Inference completed in {time.time() - start:.2f} seconds")
-
-# --- Upsample if enabled ---
-if Upsample:
-    predictions = [
-        tfi.resize(p, [384, 384], method="bilinear").numpy()
-        for p in predictions
-    ]
-
-# --- Prepare Prediction Array ---
-predictionsArray = np.array([np.squeeze(p) for p in predictions])  # shape: [N, H, W]
-
-# --- Stitch Output ---
-stitchedScenes = stitchPatches(predictionsArray, singleSceneID)
-
-# --- Save stitched scenes ---
 os.makedirs(saveFolder, exist_ok=True)
-for sceneId, sceneArray in stitchedScenes.items():
-    npyPath = os.path.join(saveFolder, f"scene_{sceneId}.npy")
-    np.save(npyPath, sceneArray)
-    # Normalize prediction to [0, 255] for PNG saving
-    imgArray = (sceneArray * 255).clip(0, 255).astype(np.uint8)
-    pngPath = os.path.join(saveFolder, f"scene_{sceneId}.png")
-    Image.fromarray(imgArray).save(pngPath)
-    print(f"✅ Scene {sceneId} stitched and saved")
 
-# --- Optional: Show sample
-sceneId = singleSceneID
-plt.figure(figsize=(12, 12))
-plt.imshow(stitchedScenes[sceneId], cmap="gray")
-plt.title(f"Scene {sceneId}")
-plt.axis('off')
-plt.show()
+def runScene(sceneId: int):
+    """Infer, (optionally) upsample, stitch, and save for a single scene."""
+    cols, rows = sceneGridSizes[sceneId]
+    total = math.ceil((cols * rows) / batchSize)
+
+    # Build a per-scene dataset so we only keep one scene in memory
+    (_, _, _, _, sceneDS, _) = buildDS(
+        includeTestDS=True,
+        batchSize=batchSize,
+        imgSize=imgSize,
+        singleSceneID=sceneId
+    )
+
+    preds = []
+    start = time.time()
+    for xBatch, _ in tqdm(sceneDS, total=total, desc=f"Scene {sceneId}"):
+        yPred = model(xBatch, training=False)   # [B,H,W,1]
+        preds.extend([p.numpy() for p in tf.unstack(yPred)])
+
+    # Optional per-patch upsampling (still only one scene in RAM)
+    if Upsample:
+        preds = [tfi.resize(p, [384, 384], method="bilinear").numpy() for p in preds]
+
+    # Stitch just this scene and save
+    predArray = np.array([np.squeeze(p) for p in preds])   # [N,H,W]
+    stitched  = stitchPatches(predArray, sceneId)          # {sceneId: canvas}
+
+    canvas = stitched[sceneId]
+    np.save(os.path.join(saveFolder, f"scene_{sceneId}.npy"), canvas)
+    imgArray = (canvas * 255).clip(0, 255).astype(np.uint8)
+    Image.fromarray(imgArray).save(os.path.join(saveFolder, f"scene_{sceneId}.png"))
+
+    print(f"⏱️ Scene {sceneId} done in {time.time() - start:.2f}s → saved")
+
+# --- Dispatch ---
+if singleSceneID_loaded is not None:
+    # Single scene mode (keeps original behavior)
+    print(f"🧩 Inference for Scene {singleSceneID_loaded}")
+    runScene(singleSceneID_loaded)
+else:
+    # Full dataset: iterate scene-by-scene to keep memory low
+    print("🧩 Inference for full test set (scene-by-scene)")
+    for sid in sorted(sceneGridSizes.keys()):
+        runScene(sid)
