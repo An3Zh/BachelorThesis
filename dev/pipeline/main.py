@@ -10,6 +10,18 @@ import numpy as np
 import tensorflow as tf
 from evaluate import evaluatePRC
 from pathlib import Path
+import sys
+
+class Tee(object):
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()  # flush so you see it immediately
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 batchSize         = 4
@@ -24,12 +36,18 @@ numCalBatches     = 1
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
                                             imgSize=imgSize, valRatio=valRatio, trainValDSSize=trainValDSSize)
 
-model   = modelArchitecture(batchShape=(batchSize, *imgSize, 4))
-model.summary()
-
 now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 runFolder = f"dev/pipeline/results/runs/run_{now}"
 os.makedirs(runFolder, exist_ok=True)
+
+log_file = open(Path(runFolder) / "history.txt", 'w')
+tee = Tee(sys.stdout, log_file)
+sys.stdout = tee
+sys.stderr = tee  # Optional: log errors too
+
+model   = modelArchitecture(batchShape=(batchSize, *imgSize, 3))
+model.summary()
+
 shutil.copy('dev/pipeline/model.py', f'{runFolder}/my_model.py')
 plot_model(model, to_file=f'{runFolder}/model.pdf', show_shapes=True, show_layer_names=True)
 
@@ -59,7 +77,7 @@ with open(f'{runFolder}/model_architecture.json', "w") as f:
     f.write(model.to_json())
 
 historyuNet = model.fit(trainDS, validation_data=valDS, epochs=numEpochs, callbacks=[checkpoint, earlyStop, lrReduce], 
-                        steps_per_epoch=trainSteps, validation_steps=valSteps, validation_freq=5)
+                        steps_per_epoch=trainSteps, validation_steps=valSteps, validation_freq=5, verbose=2)
 
 model.save(f'{runFolder}/endModel.h5')
 print('-' * 40)
@@ -85,8 +103,10 @@ bestThr, bestF1 = evaluatePRC(yTrue, yScores, showPlot=False, savePlotPath=plotP
 with open(f'{runFolder}/val_threshold.json', "w") as f:
     json.dump({"best_threshold": float(bestThr), "best_f1": float(bestF1)}, f, indent=2)
 
-print(f"Validation PRC → τ* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_threshold.json)")
+print(f"Validation PRC -> Thr* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_threshold.json)")
 
 model = asBatchOne(model, modelArchitecture, imgSize)
 model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)
 convertToEdge(runFolder)
+
+log_file.close()

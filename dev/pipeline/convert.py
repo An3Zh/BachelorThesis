@@ -18,7 +18,7 @@ def representativeDatasetGen(imgSize, numCalBatches):
         yield [xBatch]
 
 def asBatchOne(model, modelArchitecture, imgSize):
-    modelBatchOne = modelArchitecture(batchShape=(1, *imgSize, 4))
+    modelBatchOne = modelArchitecture(batchShape=(1, *imgSize, 3))
     modelBatchOne.set_weights(model.get_weights())
     return modelBatchOne
 
