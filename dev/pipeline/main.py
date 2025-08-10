@@ -41,7 +41,7 @@ run_config = {
     "batch_size": batchSize,
     "epochs": numEpochs,
     "optimizer": "adam",
-    "loss": "softJaccardLoss",
+    "loss": "binarycrossentropy",
     "metrics": ["MeanIoU", "diceCoefficient"],
     "learning_rate": model.optimizer.lr.numpy() if hasattr(model.optimizer, 'lr') else None,
     "train_steps": trainSteps,
