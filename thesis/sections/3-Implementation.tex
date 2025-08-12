@@ -108,6 +108,7 @@ Optionally, it also returns test subset, which may contain either the entire tes
 After inference, the model's output patches can be passed to the \code{stitchPatches} function, which reconstruct and saves the final scene images for further evaluation.
 
 \section{Model}
+\label{sec:model}
 
 The core building blocks and utility functions for architecting the model are organized in \code{model.py}.
 \gls{cnn} layers are constructed using \gls{tf}'s built-in \glspl{api}, allowing for modular and reusable design.
@@ -117,7 +118,7 @@ The core building blocks and utility functions for architecting the model are or
 \begin{tabularx}{\textwidth}{l X l l}
 \textbf{Model Name} & \textbf{Description} & \textbf{Parameters} & \textbf{Input Size} \\
 \hline
-BaseNet      & Minimal CNN for proof-of-concept; 2 conv layers, 1 dense & 300,000 & 192×192×4 \\
+BaseNet      & Minimal CNN for proof-of-concept 2 conv layers, 1 dense & 300,000 & 192×192×4 \\
 MediumNet    & Deeper CNN; 4 conv, 2 dense, dropout, QAT-ready          & 2,000,000 & 192×192×4 \\
 LargeNet     & U-Net variant; skip connections, batch norm, QAT         & 30,000,000 & 192×192×4 \\
 \end{tabularx}
@@ -131,8 +132,11 @@ It served as proof-of-concept and was used for initial debugging of training and
 The model was not annotaded for \gls{qat}.
 
 Below are examples of layers of two models, the left one is not annotaded for \gls{qat}, the right one is annotaded for \gls{qat}.
+It is visualized using Netron\footnote{\url{https://netron.app/}}.
 As outlined in \secshortref{subsubsec:qat}, the \code{QuantizeWrapperV2} and \code{QuantizeLayer} \glspl{tfop} are inserted in the architecture,
 wrapping the base layers with quantization-dequantization operations.
+
+\todo{explain why quantized layer after input. Explain why youre putting this example here, why its important to step from regular model to qat annotated model}
 
 \begin{figure}[H]
   \centering
@@ -150,8 +154,9 @@ wrapping the base layers with quantization-dequantization operations.
   \caption{Zwei SVGs nebeneinander (als PDF)}
 \end{figure}
 
-
-It is important to emphasize, that the \code{BatchNormalization} \gls{tfop} is inserted after \code{Conv2D} and before \code{Activation} \glspl{tfop} \cite{batchnormActivation}.
+By taking a closer look it has to be mentioned, that in \gls{qat} model the \code{QuantizeLayer} is insertded in order to quantize input tensors.
+The function Conv2D is wrapped into quantizedWrapper ...\todo{explain all basics, to be continued in Conversion}
+It is important to emphasize, that the \gls{bn} \gls{tfop} is inserted after \code{Conv2D} and before \code{Activation} \glspl{tfop} \cite{batchnormActivation}.
 
 Later on, a more complex, already \code{uNet} architecture was implemented, already involving more, deeper layers and implementing skip connections.
 Early versions of this model architecture were not \gls{qat} annotaded, only \gls{ptq} was used at conversion time.
@@ -241,21 +246,346 @@ As a result, an improvement is planned that will allow passing the desired \gls{
 The file \code{convert.py} contains all necessary functions and utilities for model conversion and \gls{edgetpu} compilation.
 These functions are called from \code{main.py} immediately after training is complete.
 
+\subsection*{Weight Transfer}
+
 As outlined in \secshortref{subsec:hardware}, the \gls{edgetpu} supports input tensors with at most three dimensions.
 This necessitates the use of batch size one, since the input tensor shape is already \ensuremath{image~height~\times~image~width~\times~number~of~channels}.
 During training, larger batch sizes are typically used for efficiency.
 Therefore, after training, the function \code{asBatchOne} is used to transfer the trained weights to a model with identical architecture,
 but with batch size set to one for the input, all intermediate computations, and the output.
 
-The \code{tf.lite.TFLiteConverter} utility is then used to perform \gls{ptq} and convert the model to
-the \code{.tflite} format\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/lite/TFLiteConverter}}.
+\subsection*{Post-Training Quantization}
+
+The \code{tf.lite.TFLiteConverter}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/lite/TFLiteConverter}} utility is used to perform \gls{ptq} and convert the model to
+the \code{.tflite} format.
 A representative dataset is generated using the \code{representativeDatasetGen} function, consisting of training \gls{rgb} and \gls{nir} patches.
 The number of calibration batches used can be adjusted via \code{numCalBatches}, as defined in \secshortref{sec:training}.
 The greater the amount of calibration data, the more likely the observed value range will closely match the inference data, improving quantization accuracy.
 
-Next, all supported \glspl{tfop} are quantized, and model inputs and outputs are quantized as well.
-While various data types can be used for quantization, only \gls{int8} or \gls{uint8} are used in this work, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
-The quantized model is then saved, and the \gls{edgetpu} compiler is invoked.
+Next, all supported \glspl{tfop}, as well as model inputs and outputs are quantized.
+While various data types can be used for quantization in general,
+only \gls{int8} or \gls{uint8} are used in this work, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
+
+The following subchapter provides deeper investigation into quantization of model parameters by
+analyzing \gls{qat} annotated \gls{float32} model and its quantized version with the help of Netron\footnote{\url{https://netron.app/}}.
+This chapeter adresses the ones, who is willing to deepen their quantization understanding of parameters and take a grasp of
+full-integer operation execution general techniques on edge devices, such as \gls{edgetpu}.
+However, the \gls{qat} annotation and \gls{ptq} are already wrapped into compact convenient ready to use \gls{tflite} commands.
+Thus, this chapter has no impact on knowledge of pure implementation of quantized models,
+but deeper level of understanding can be benificial for debugging,
+or creating custom, potentially more powerful models or
+the one can just admire such beautiful engineering decisions of speed-memory-accuracy tradeoff on edge devices.
+
+\subsubsection*{Practical example of Model quantization}
+
+Below, a part of the architecture of the \code{.tflite} model after \gls{ptq} (right) is shown, compared to the same \gls{qat} annotaded model (left) before conversion.
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPartQBeforePTQ.pdf}
+    \caption{Links}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPartQAfterPTQ.pdf}
+    \caption{Rechts}
+  \end{subfigure}
+  \caption{Zwei SVGs nebeneinander (als PDF)}
+\end{figure}
+
+Furthermore, Netron provides additional information about graph nodes (model layers) and connections (tensor passes). For instance,
+layers weights and biases can be directly investigated and values observed. In the tables below,
+quantization relevant information is displayed for further investigation.
+For both \gls{qat} annotated model as well as for resulting quantized model the relevant information about four layers can be gathered:
+
+% Example usage
+\subsubsection*{\gls{qat} Model (left)}
+
+\begin{layerbox}{Layer Type: QuantizeLayer}{Layer Name: Quantize Input}
+  \begin{center}
+    \textbf{Input value range:} \\[2pt]
+    $\min = 0 \quad\quad \max = 1$
+  \end{center}
+\end{layerbox}
+
+\begin{layerbox}{Layer Type: QuantizeWrapperV2}{Layer Name: Conv2D No. 1}
+  \begin{center}
+    \textbf{Kernel shape:} \\[2pt]
+    $[3, 3, 4, 32]$ \\[6pt]
+    \textbf{Kernel No. 1 value range:} \\[2pt]
+    $\min = -0.544256329536438 \quad\quad \max = 0.544256329536438$ \\[6pt]
+    \textbf{First element of Kernel No. 1 value:} \\[2pt]
+    $0.032761260867118835$ \\[6pt]
+    \textbf{Bias shape:} \\[2pt]
+    $[32]$ \\[6pt]
+    \textbf{Bias No. 1 value:} \\[2pt]
+    $0.1983194351196289$ \\[6pt]
+    \textbf{Activation value range:} \\[2pt]
+    $\min = -2.4379329681396484 \quad\quad \max = 1.0039010047912598$
+  \end{center}
+\end{layerbox}
+
+\begin{layerbox}{Layer Type: \glsxtrlong{bn}}{Layer Name: \glsentryshort{batchnorm} No. 1}
+  \begin{center}
+    \textbf{Shape of $\gamma$, $\beta$, $\mu_{\text{moving}}$, $\sigma^2_{\text{moving}}$ parameters:} \\[2pt]
+    $[32]$ \\[6pt]
+    \textbf{Parameter $\gamma_1$ value:} \\[2pt]
+    1.110548973083496 \\[6pt]
+    \textbf{Parameter $\beta_1$ value:} \\[2pt]
+    -0.11593257635831833 \\[6pt]
+    \textbf{Parameter $\mu_{\text{moving},1}$ value:} \\[2pt]
+    0.17263321578502655 \\[6pt]
+    \textbf{Parameter $\sigma^2_{\text{moving},1}$ value:} \\[2pt]
+    0.00221889466047287
+  \end{center}
+\end{layerbox}
+
+
+\begin{layerbox}{Layer Type: QuantizeWrapperV2}{Layer Name: Activation No. 1}
+  \begin{center}
+    \textbf{Output value range:} \\[2pt]
+    $\min = -3.696099329375535 \mathrm{e}{-11} \quad\quad \max = 18.816810607910156$
+  \end{center}
+\end{layerbox}
+
+\bigskip
+\subsubsection*{\gls{ptq} Model (right)}
+
+\begin{layerbox}{Layer Type: Conv2D}{Layer Name: Conv2D No. 1}
+  \begin{center}
+    \textbf{Input affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.003921568859368563 \times (q_{\text{x}} + 128)$ \\[6pt]
+    \textbf{Kernel No. 1 symmetric dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.004285482689738274 \times q_{\text{x}}$ \\[6pt]
+    \textbf{First element of Kernel No. 1 quantized value:} \\[2pt]
+    $8$ \\[6pt]
+    \textbf{Bias No. 1 symmetric dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.000016805815903353505 \times q_{\text{x}}$ \\[6pt]
+    \textbf{Bias No. 1 quantized value:} \\[2pt]
+    $11801$ \\[6pt]
+  \end{center}
+\end{layerbox}
+
+\begin{layerbox}{Layer Type: Mul}{Layer Name: \gls{bn} No. 1 Scale}
+  \begin{center}
+    \textbf{Input affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.013497387990355492 \times (q_{\text{x}} - 53)$ \\[6pt]
+    \textbf{Fused \gls{bn} multiplier $M_c$ affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.10698594152927399 \times (q_{\text{x}} + 128)$ \\[6pt]
+    \textbf{Multiplier $M_1$ quantized value:} \\[2pt]
+    $55$ \\[6pt]
+  \end{center}
+\end{layerbox}
+
+\begin{layerbox}{Layer Type: Add}{Layer Name: \gls{bn} No. 1 Shift}
+  \begin{center}
+    \textbf{Input affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.17354172468185425 \times (q_{\text{x}} - 26)$ \\[6pt]
+    \textbf{Fused \gls{bn} additive term $A_c$ affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.0339626707136631 \times (q_{\text{x}} + 10)$ \\[6pt]
+    \textbf{Additive term $A_1$ quantized value:} \\[2pt]
+    $-113$ \\[6pt]
+  \end{center}
+\end{layerbox}
+
+\begin{layerbox}{Layer Type: Relu}{Layer Name: Activation No. 1}
+  \begin{center}
+    \textbf{Output affine dequantization formula:} \\[2pt]
+    $x_{\text{q}} \approx 0.07379141449928284 \times (q_{\text{x}} + 128)$ \\[6pt]
+  \end{center}
+\end{layerbox}
+
+Before we dive into calculations, lets take a closer look at a Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}}.
+Below the extraction only about relevant \gls{tfop} Conv2D is presented:
+
+\begin{verbatim}
+CONV_2D
+  Input 0:
+    data_type  : int8
+    range      : [-128, 127]
+    granularity: per-tensor
+  Input 1 (Weight):
+    data_type  : int8
+    range      : [-127, 127]
+    granularity: per-axis (dim = 0)
+    restriction: zero_point = 0
+  Input 2 (Bias):
+    data_type  : int32
+    range      : [int32_min, int32_max]
+    granularity: per-axis
+    restriction: (scale, zero_point) = (input0_scale*input1_scale[...], 0)
+  Output 0:
+    data_type  : int8
+    range      : [-128, 127]
+    granularity: per-tensor
+\end{verbatim}
+
+Using the provided information, quantization calculations can be retraced for a deeper understanding of model quantization.
+It starts with observing the \code{input\_1} values, which are indeed the model input tensors, with the help of \code{QuantizeLayer}.
+As expected the values are ranging from 0 to 1, because of normalized input patches. Therefore,
+the input scale and zeropoint can be calculated using \ref{eq:scale} and \ref{eq:zeropoint} introduced in \secshortref{subsec:quantization}:
+
+\begin{equation*}
+\text{scale} = \frac{1 - 0}{127 - (-128)} = 0.003921568627450980
+\end{equation*}
+
+\begin{equation*}
+\text{zero-point} = \text{round}\left( -128 - \frac{0}{\text{scale}} \right) = -128
+\end{equation*}
+
+The calculated values are aligning with Input affine dequantization formula in Conv2D layer of \gls{ptq} Model.
+The precision difference at 10th decimal number of precision is expected due to the precision limits of \gls{float32} format.
+The affine (asymetric) quantization can be confirmed with Quantization Specification Table,
+using for \code{Input 0} the quantized asymetric range [-128,127] and not specifying \code{restriction: zero\_point = 0}.
+
+Moving forward to weights of a Conv2D layer the Table specifies per-axis granularity with symmetrical quantization (zero-point = 0),
+which can be observed by taking a look at 32 tracked Kernel value ranges. For the sake of spacing the value range only of Kernel No. 1 is presented in \gls{ptq} Model Table.
+By taking a closer look at this value range we can see, that it is indeed fully symmetrical around 0.
+That fact implies, that these are force clipped extrema of real Kernel values to adjust them for symmetric quantization.
+This fact can be confirmed by taking a look actual min, max and mean values of in this case already whole weight tensor:
+min = -0.4122757017612457, max = 0.5442604422569275, mean = -0.005126346834471305.
+These values were again left out of the presented table, but can be read off with help of Netron model analysis tool. 
+Furthermore the fact that Kernel No. 1 contains the largest max value compared to the other 31 Kernels and the fact,
+that it this force clipped max value is still not aligning with the actual tensor max value implies,
+that \gls{tf} utilizes additional optimization techniques in order to find the best suitable quantized range for each one of 32 Kernels.
+Thus can be assumed, that outlier aware clipping is used or mean adjustment is implied since the actual tensor values are not perfectly zero mean distributed,
+but quantization restriction forces zero-point = 0.
+Further investigation in this fenomenon bears excessive research effort and lies outside of this work's scope.
+
+Utilizing the force clipped extrema the symmetric quantization scale can be derived:
+\begin{equation*}
+\text{scale} = \frac{0.544256329536438 - (-0.544256329536438)}{127 - (-127)} = 0.004285482909735732
+\end{equation*}
+and confirmed with read off Kernel No. 1 symmetric dequantization fomula of Conv2D No. 1 layer from \gls{ptq} Model Table.
+Again, \gls{float32} limits are exhausted at 10th decimal number of precision.
+Using the formula \ref{eq:dequantize}, the first quantized element of Kernel No. 1 can be clearly dequantized back to its approximate (!) corresponding \gls{float32} value:
+
+\begin{equation*}
+x_{q} \approx 0.004285482689738274 \cdot 8 = 0.034283861517906192
+\end{equation*}
+
+Additional precision loss from quantization operations can be obviously spotted here. The absolute, relative, and \gls{lsb} errors
+can be calculated for this case as follows:
+\begin{itemize}
+    \item $e_{\text{abs}} = 0.03428386151790619 - 0.032761260867118835 \approx 0.0015226006507873535$
+    \item $e_{\text{rel}} = \frac{0.0015226006507873535}{0.032761260867118835} \times 100\% \approx 4.645\%$
+    \item $e_{\text{lsb}} = \frac{0.0015226006507873535}{0.004285482689738274} \approx 0.355,\ \Delta = 0.004285482689738274$
+\end{itemize}
+
+\gls{lsb} error being < 0.5 is a good sign here, indicating that the boundaries of scale are not overshoot,
+hence providing one factor of reassuring, that quantization was performed adequately,
+without potential errors in scale mismatching, clipping, or encoding/decoding.
+
+Looking at restriction for bias in the Table, an interesting thing can be observed, namelz that it has no own quantization scale based on its observed extrema,
+hence no min and max values for biases are logged by QuantizedWrapperV2 of Conv2D layer.
+Instead its scale is artificially calculated using multiplied layer input scale with per-channel weight scale,
+giving the exact number of bias scales as weight scales per axis (channel).
+This is an engineering decision for acceleration of inference at cost of slight precision loss.
+The thing is, that by multiplying input values with weights, each having its own scale, a new quantization scale is created.
+In order to add bias to the product, its initial \gls{float32} values have to be quantized with this exact same scale.
+It could be quantized with its own scale, then the product result rescaled,
+but this brings a ton of additional computational operations, which will significantly slow down the inference process.
+Instead a fast fixed-point arithmetic is used by calculating the quantized multiplier and using bit shift in order to solve
+this tricky problem coming from multiplying quantized values.
+
+Following calculations can be performed for bias as well, calculating its scale and restoring its approximate \gls{float32} value.
+
+\begin{equation*}
+\text{scale} = 0.003921568859368563 \cdot 0.004285482689738274 = 0.000016805815463440644535387373480262
+\end{equation*}
+
+This value corresponds to the scale in Bias No. 1 symmetric dequantization formula.
+
+\begin{equation*}
+x_{q} \approx 0.000016805815903353505 \cdot 11801 = 0.198325433475474712505
+\end{equation*}
+
+Restored \gls{float32} bias No. 1 value with a reconstruction error from \gls{float32} and quantization inaccuracies.
+
+As it can be seen from Netron analysis, the \gls{bn} \gls{tfop} is split in two basic \glspl{tfop} after qiantization: Mul and Add.
+This is a result of internal structure of \gls{bn} as well as , which can be described using following formula:
+
+\begin{equation}
+y = \gamma \cdot \frac{x - \mu_{\text{moving}}}{\sqrt{\sigma^2_{\text{moving}} + \epsilon}} + \beta
+\label{eq:bn}
+\end{equation}
+
+\begin{equation}
+M_c = \frac{\gamma_c}{\sqrt{\sigma^2_{\text{moving},c} + \epsilon}}, 
+\quad
+A_c = \beta_c - \frac{\gamma_c \cdot \mu_{\text{moving},c}}{\sqrt{\sigma^2_{\text{moving},c} + \epsilon}}
+      = \beta_c - M_c \cdot \mu_{\text{moving},c}
+\label{eq:bnquant}
+\end{equation}
+
+Before diving into analysis it has to be mentioned,
+that Mul Input affine dequantization formula is calculated using extrema of outputs of Conv2D No. 1 layer,
+similar to previous calculations of scale an zero-point.
+
+Now, lets dive into analyzing \gls{bn} and why it is represented by two \glspl{tfop} after quantization.
+Fitstly, here is a description of each parameter used in equations:
+
+\begin{itemize}
+    \item $x$ — input value to be normalized.
+    \item $y$ — output value after batch normalization.
+    \item $\mu_{\text{moving},c}$ — moving mean for channel $c$, computed during training as an exponential moving average of per-batch means; used in inference because batch statistics from a single sample are often unreliable.
+    \item $\sigma^2_{\text{moving},c}$ — moving variance for channel $c$, computed during training as an exponential moving average of per-batch variances; also used in inference for the same reason as the moving mean.
+    \item $\epsilon$ — small constant to avoid division by zero.
+    \item $\gamma_c$ — learnable scale parameter for channel $c$.
+    \item $\beta_c$ — learnable shift parameter for channel $c$.
+    \item $M_c$ — per-channel multiplier used in quantized inference.
+    \item $A_c$ — per-channel additive term used in quantized inference.
+\end{itemize}
+
+After quantization, the statistical parameters moving mean and moving variance, as well as trained parameters gamma and beta are fused into multiplication and addition paramters,
+hence this split in Mul and Add. Using the provided formulas, \gls{float32} parameters can be reverse-engineered with a certain accuracy loss from their quantized values:
+
+\begin{equation*}
+\begin{gathered}
+M_1 = 0.10698594152927399 \cdot (55 + 128) \approx 19.5784 \\
+\sqrt{\sigma^2_{\text{moving},1} + \epsilon} = \sqrt{0.00221889466047287 + 0.001} \approx 0.0567353 \\
+\hat{\gamma}_1 = M_1 \cdot \sqrt{\sigma^2_{\text{moving},1} + \epsilon} \approx 19.5784 \times 0.0567353 \approx 1.1107881 \\
+\hat{\gamma}_1 = 1.1107881 \approx \gamma_1 = 1.110548973083496
+\end{gathered}
+\end{equation*}
+
+
+\begin{equation*}
+\begin{gathered}
+A_1 = 0.0339626707136631 \cdot (-113 + 10) \approx -3.4941551 \\
+\beta_1 = A_1 + M_1 \cdot \mu_{\text{moving},1} \approx -3.4941551 + 19.5784 \times 0.1726332 \approx -0.1159326 \\
+\beta_1 = -0.1159326 \approx \beta_{1,\text{float}} = -0.11593257635831833
+\end{gathered}
+\end{equation*}
+
+At the end, the Output affine dequantization formula is calculated using extrema of Activation No. 1 layer:
+
+\begin{equation*}
+\text{scale} = \frac{18.816810607910156 - (-3.696099329375535 \mathrm{e}{-11})}{127 - (-128)} = 0.07379141414881222
+\end{equation*}
+
+\begin{equation*}
+\text{zero-point} = \text{round}\left( -128 - \frac{-3.696099329375535 \mathrm{e}{-11}}{\text{scale}} \right) = -128
+\end{equation*}
+
+All further quantization operations of \glspl{tfop} in the model are performed in a similar way,
+with pre-specified restrictions and utilizing repeated methods under the hood.
+
+By analizing the illustrated information, important quantization methods can be retraced:
+\begin{itemize}
+  \item After \gls{ptq}, Quantize Input layer defines the quantization scale \dots
+\end{itemize}
+
+By taking a closer look on a left \gls{qat} annotated model the \code{QuantizeLayer} can be seen in action,
+which applies the so called "fake" quantization on \code{input\_1} tensor by quantizing it and immediately dequantizing back.
+
+
+After the quantized model is saved, the \gls{edgetpu} Compiler is invoked.
+
+\subsection*{Edge TPU Compiling}
 
 Since training may be performed either on a local Windows machine or on a Linux-based cloud GPU instance from Thunder Compute,
 cross-platform automation of the pipeline is ensured by using helper functions and platform detection before invoking the \gls{edgetpu} compiler.
@@ -271,6 +601,8 @@ The final result is the \code{quant\_edgetpu.tflite} file --- a quantized, \gls{
 
 \section{Deployment}
 \label{sec:deployment}
+
+
 
 \section{Evaluation}
 

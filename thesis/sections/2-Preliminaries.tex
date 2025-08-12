@@ -274,7 +274,8 @@ It should be clarified that model training can be performed using various numeri
 \subsubsection{Quantization-Aware Training}
 \label{subsubsec:qat}
 
-The model architecture is modified by inserting quantization-dequantization operations at the edges, and by applying them to weights, biases, and activations.
+The model architecture is modified by inserting quantization-dequantization operations at the connections between layers,
+and by applying them to weights, biases, and activations.
 In the forward pass, dequantization is applied immediately after quantization for each \gls{qat}-annotated \gls{float32} value.
 In this way, all values remain in \gls{float32} format for training,
 but quantization inaccuracies are introduced, exposing the model to quantization effects during training and allowing it to adapt its parameters accordingly.
@@ -283,7 +284,7 @@ The rounding function essential to quantization is, however, not differentiable.
 setting the gradient of quantization operations to 1 within the quantized range and to 0 outside it.
 This allows gradients to flow through the quantization-dequantization operations \cite{qatBackwardPass}.
 
-At the end of \gls{qat}, the model parameters are adapted to the effects of quantization and will therefore exhibit better performance after quantization compared to a model trained without \gls{qat}.
+At the end of \gls{qat}, the model parameters are adapted to the effects of quantization and will therefore exhibit better performance after \gls{ptq} compared to a model without \gls{qat}.
 
 \todo{Insert Netron screenshot showing scales, quantizedwrappersV2, and bias scales in the implementation/conversion section. Explain scale and bit shifts for integer arithmetic on Coral.}
 
@@ -291,7 +292,7 @@ At the end of \gls{qat}, the model parameters are adapted to the effects of quan
 
 The actual conversion of model parameters is performed during \gls{ptq}.
 Regardless of whether \gls{qat} was performed, \gls{ptq} can always be applied to quantize a model.
-There are three common \gls{ptq} methods, with each subsequent method quantizing more parameters until all \gls{float32} values in the model are quantized:
+There are three common \gls{ptq} methods, with each subsequent method quantizing more parameters until covering all \gls{float32} values in the model:
 
 \begin{itemize}
 \item \textbf{Weight-Only Quantization}: Model weights and biases are statically determined after training;
@@ -343,7 +344,7 @@ The following image from Coral documentation summarizes the model conversion and
 
 \section{Design}
 
-\subsection{Data}
+\subsection*{Data}
 
 To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented.
 A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function.
@@ -354,7 +355,7 @@ The function should output \code{tf.data.Dataset} objects \cite{tfDataset} that 
 Ideally, the testing pipeline should also be incorporated within this flexible, unified function.
 The absence of pre-cropped test subset \gls{gt} patches introduces the necessity for additional preparation steps.
 
-\subsection{Model}
+\subsection*{Model}
 
 %Separate from the dataset pipeline, the model architecture is developed independently.
 The model architecture is tailored for deployment on embedded systems, where \gls{qat} must be taken into account.
@@ -369,7 +370,7 @@ allowing convenient switching between models during training.
 %These limitations necessitate such architectural decisions, as the use of \gls{qat}.
 %For this purpose, model layers are annotaded appropriately to support later quantization and efficient deployment on hardware with limited resources.
 
-\subsection{Training}
+\subsection*{Training}
 \label{subsec:designtrain}
 
 After implementing utilities for dataset construction and defining the model architecture, the next step is to develop the training pipeline.
@@ -383,7 +384,7 @@ To ensure reproducibility and facilitate backups, it is important to store all t
 
 Finally, computational resources must be considered. To avoid prohibitively long training times, the use of more powerful machines or cloud-based resources should be evaluated.
 
-\subsection{Conversion}
+\subsection*{Conversion}
 
 After training, the model must be converted and compiled for \gls{edgetpu} inference.
 A modular approach is important here as well, simplifying debugging and ensuring correct conversion and compilation during early development.
@@ -393,8 +394,12 @@ Automation of the \gls{edgetpu} compiler,
 provided by Google\footnote{\url{https://coral.ai/docs/edgetpu/compiler/}},
 is required so that the entire training and conversion pipeline outputs a model ready for deployment on the \gls{devboard}.
 
-\subsection{Deployment}
-\subsection{Evaluation}
+\subsection*{Deployment}
+\label{subsec:designdep}
+
+
+
+\subsection*{Evaluation}
 I wanna first conveniently have training, validation and test datasets ready for efficient TF training.
 Then the convenient model architecture builder needs to be implemented
 quantization aware training and post training quantization should be considered

@@ -1,16 +1,7 @@
 {
 	"folders": [
 		{
-			"name": ".stuff",
-			"path": ".stuff"
-		},
-		{
-			"name": "dev",
-			"path": "dev"
-		},
-		{
-			"name": "thesis",
-			"path": "thesis"
+			"path": "."
 		}
 	]
 }

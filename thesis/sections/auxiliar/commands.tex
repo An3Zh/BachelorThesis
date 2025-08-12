@@ -1,2 +1,24 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\secshortref}[1]{\ref{#1} \nameref{#1}}
+
+\newcommand{\statline}[5]{%
+  \textbf{#1:}%
+  \ \textcolor{black!70}{#2} $\rightarrow$ \textcolor{black}{\bfseries #3};\ %
+  \textcolor{black!70}{#4} $\rightarrow$ \textcolor{black}{\bfseries #5}%
+}
+
+\newtcolorbox{layerbox}[3][]{
+  title={\begin{tabular*}{\linewidth}{@{}l@{\extracolsep{\fill}}r@{}}
+    #2 & #3
+  \end{tabular*}},
+  colback=white,
+  colbacktitle=blue!20!white,
+  coltitle=black,
+  fonttitle=\bfseries\large,
+  colframe=blue!50!black,
+  borderline={0.5mm}{0mm}{blue!50!black},
+  boxsep=1mm,
+  sharp corners=southwest,
+  enhanced,
+  #1
+}

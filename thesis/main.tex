@@ -30,6 +30,33 @@
   belowskip=10pt
 }
 
+\usepackage[most,skins]{tcolorbox}
+\usepackage{siunitx}
+
+\sisetup{
+  round-mode=places,
+  round-precision=6,
+  table-number-alignment = center
+}
+
+\tcbset{
+  colback=gray!5,
+  colframe=black!60,
+  boxrule=0.5pt,
+  arc=3mm,
+  outer arc=3mm,
+  fonttitle=\bfseries\large,
+  coltitle=black,
+  left=4mm,
+  right=4mm,
+  top=2mm,
+  bottom=2mm,
+  enhanced,
+  sharp corners=southwest,
+}
+
+%\usepackage{booktabs,multirow,array}
+
 %\onehalfspacing
 %\doublespacing
 %\setstretch{1.2} % Optional, for slight line spacing
