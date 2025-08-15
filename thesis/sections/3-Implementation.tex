@@ -262,23 +262,18 @@ A representative dataset is generated using the \code{representativeDatasetGen} 
 The number of calibration batches used can be adjusted via \code{numCalBatches}, as defined in \secshortref{sec:training}.
 The greater the amount of calibration data, the more likely the observed value range will closely match the inference data, improving quantization accuracy.
 
-Next, all supported \glspl{tfop}, as well as model inputs and outputs are quantized.
-While various data types can be used for quantization in general,
-only \gls{int8} or \gls{uint8} are used in this work, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
+Next, all supported \glspl{tfop}, as well as model inputs and outputs, are quantized.
+While various data types can be used for quantization in general, this work uses only \gls{int8} or \gls{uint8}, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
 
-The following subchapter provides deeper investigation into quantization of model parameters by
-analyzing \gls{qat} annotated \gls{float32} model and its quantized version with the help of Netron\footnote{\url{https://netron.app/}}.
-This chapeter adresses the ones, who is willing to deepen their quantization understanding of parameters and take a grasp of
-full-integer operation execution general techniques on edge devices, such as \gls{edgetpu}.
-However, the \gls{qat} annotation and \gls{ptq} are already wrapped into compact convenient ready to use \gls{tflite} commands.
-Thus, this chapter has no impact on knowledge of pure implementation of quantized models,
-but deeper level of understanding can be benificial for debugging,
-or creating custom, potentially more powerful models or
-the one can just admire such beautiful engineering decisions of speed-memory-accuracy tradeoff on edge devices.
+The following subchapter provides a deeper investigation into quantization of model parameters by analyzing a \gls{qat}-annotated \gls{float32} model and its quantized version, using the Netron tool\footnote{\url{https://netron.app/}}.
+This chapter is aimed at readers who wish to deepen their understanding of parameter quantization and gain insight into the general techniques behind full-integer operation execution on edge devices such as the \gls{edgetpu}.
+
+It should be noted that both \gls{qat} annotation and \gls{ptq} are already wrapped into convenient, ready-to-use \gls{tflite} commands. Thus, this section is not intended to teach the implementation of quantized models from scratch. Instead, it aims to offer a deeper understanding that can be beneficial for debugging, designing custom (potentially more powerful) models, or simply appreciating the engineering trade-offs between speed, memory, and accuracy on constrained devices.
 
 \subsubsection*{Practical example of Model quantization}
+\label{subsubsec:optquant}
 
-Below, a part of the architecture of the \code{.tflite} model after \gls{ptq} (right) is shown, compared to the same \gls{qat} annotaded model (left) before conversion.
+Below, part of the architecture of a \code{.tflite} model after \gls{ptq} (right) is shown, alongside the same \gls{qat}-annotated model (left) before conversion.
 
 \begin{figure}[H]
   \centering
@@ -296,10 +291,8 @@ Below, a part of the architecture of the \code{.tflite} model after \gls{ptq} (r
   \caption{Zwei SVGs nebeneinander (als PDF)}
 \end{figure}
 
-Furthermore, Netron provides additional information about graph nodes (model layers) and connections (tensor passes). For instance,
-layers weights and biases can be directly investigated and values observed. In the tables below,
-quantization relevant information is displayed for further investigation.
-For both \gls{qat} annotated model as well as for resulting quantized model the relevant information about four layers can be gathered:
+Netron also provides detailed information about graph nodes (model layers) and their connections (tensor passes). For example, layer weights and biases can be directly inspected, and values can be examined.
+In the tables below, quantization-relevant information is displayed for further analysis. For both the \gls{qat} annotated model and the resulting quantized model, the relevant information for four layers is collected.
 
 % Example usage
 \subsubsection*{\gls{qat} Model (left)}
@@ -398,8 +391,7 @@ For both \gls{qat} annotated model as well as for resulting quantized model the 
   \end{center}
 \end{layerbox}
 
-Before we dive into calculations, lets take a closer look at a Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}}.
-Below the extraction only about relevant \gls{tfop} Conv2D is presented:
+Before diving into the calculations, let's examine the Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}}. Below is the excerpt relevant to the \gls{tfop} \code{Conv2D}:
 
 \begin{verbatim}
 CONV_2D
@@ -423,10 +415,9 @@ CONV_2D
     granularity: per-tensor
 \end{verbatim}
 
-Using the provided information, quantization calculations can be retraced for a deeper understanding of model quantization.
-It starts with observing the \code{input\_1} values, which are indeed the model input tensors, with the help of \code{QuantizeLayer}.
-As expected the values are ranging from 0 to 1, because of normalized input patches. Therefore,
-the input scale and zeropoint can be calculated using \ref{eq:scale} and \ref{eq:zeropoint} introduced in \secshortref{subsec:quantization}:
+Using this information, we can retrace quantization calculations for a better understanding of model transformation. We start with the \code{input\_1} values — the model's input tensors — as observed in the \code{QuantizeLayer}. As expected, these range from 0 to 1 due to normalized input patches.
+
+The input scale and zero-point can be calculated using equations \ref{eq:scale} and \ref{eq:zeropoint} from \secshortref{subsec:quantization}:
 
 \begin{equation*}
 \text{scale} = \frac{1 - 0}{127 - (-128)} = 0.003921568627450980
@@ -436,77 +427,46 @@ the input scale and zeropoint can be calculated using \ref{eq:scale} and \ref{eq
 \text{zero-point} = \text{round}\left( -128 - \frac{0}{\text{scale}} \right) = -128
 \end{equation*}
 
-The calculated values are aligning with Input affine dequantization formula in Conv2D layer of \gls{ptq} Model.
-The precision difference at 10th decimal number of precision is expected due to the precision limits of \gls{float32} format.
-The affine (asymetric) quantization can be confirmed with Quantization Specification Table,
-using for \code{Input 0} the quantized asymetric range [-128,127] and not specifying \code{restriction: zero\_point = 0}.
+The calculated values align with the Input affine dequantization formula for the Conv2D layer in the \gls{ptq} model. The minor precision difference at the 10th decimal place is expected due to \gls{float32} limits. This confirms the use of affine (asymmetric) quantization for \code{Input 0}, consistent with the table's range [-128,127][-128,127] and the absence of a zero-point restriction.
 
-Moving forward to weights of a Conv2D layer the Table specifies per-axis granularity with symmetrical quantization (zero-point = 0),
-which can be observed by taking a look at 32 tracked Kernel value ranges. For the sake of spacing the value range only of Kernel No. 1 is presented in \gls{ptq} Model Table.
-By taking a closer look at this value range we can see, that it is indeed fully symmetrical around 0.
-That fact implies, that these are force clipped extrema of real Kernel values to adjust them for symmetric quantization.
-This fact can be confirmed by taking a look actual min, max and mean values of in this case already whole weight tensor:
-min = -0.4122757017612457, max = 0.5442604422569275, mean = -0.005126346834471305.
-These values were again left out of the presented table, but can be read off with help of Netron model analysis tool. 
-Furthermore the fact that Kernel No. 1 contains the largest max value compared to the other 31 Kernels and the fact,
-that it this force clipped max value is still not aligning with the actual tensor max value implies,
-that \gls{tf} utilizes additional optimization techniques in order to find the best suitable quantized range for each one of 32 Kernels.
-Thus can be assumed, that outlier aware clipping is used or mean adjustment is implied since the actual tensor values are not perfectly zero mean distributed,
-but quantization restriction forces zero-point = 0.
-Further investigation in this fenomenon bears excessive research effort and lies outside of this work's scope.
+Moving to the Conv2D layer weights, the table specifies per-axis granularity with symmetric quantization (zero-point=0zero-point=0). Inspection of the 32 kernel value ranges (only Kernel No. 1 shown here) confirms symmetry around zero. This suggests that TensorFlow enforces clipping of weight extremes to fit symmetric ranges.
 
-Utilizing the force clipped extrema the symmetric quantization scale can be derived:
+Netron reveals that Kernel No. 1 has the largest max value among the 32 kernels, yet it still doesn't match the actual tensor maximum (-0.4123-0.4123 to 0.544260.54426), indicating that TensorFlow may apply additional optimization — likely outlier-aware clipping or mean adjustment — since real values are not perfectly zero-mean but the quantization requires zero-point =0=0. A detailed investigation of this effect lies outside the scope of this work.
+
+Using the clipped extrema, the symmetric quantization scale is:
+
 \begin{equation*}
 \text{scale} = \frac{0.544256329536438 - (-0.544256329536438)}{127 - (-127)} = 0.004285482909735732
 \end{equation*}
-and confirmed with read off Kernel No. 1 symmetric dequantization fomula of Conv2D No. 1 layer from \gls{ptq} Model Table.
-Again, \gls{float32} limits are exhausted at 10th decimal number of precision.
-Using the formula \ref{eq:dequantize}, the first quantized element of Kernel No. 1 can be clearly dequantized back to its approximate (!) corresponding \gls{float32} value:
+
+This matches the Kernel No. 1 symmetric dequantization formula from the \gls{ptq} model table (within float precision limits).
+Applying equation \ref{eq:dequantize}, the first quantized element of Kernel No. 1 can be approximately dequantized to:
 
 \begin{equation*}
 x_{q} \approx 0.004285482689738274 \cdot 8 = 0.034283861517906192
 \end{equation*}
 
-Additional precision loss from quantization operations can be obviously spotted here. The absolute, relative, and \gls{lsb} errors
-can be calculated for this case as follows:
+The resulting precision loss is small and can be quantified by absolute, relative, and \gls{lsb} errors:
+
 \begin{itemize}
     \item $e_{\text{abs}} = 0.03428386151790619 - 0.032761260867118835 \approx 0.0015226006507873535$
     \item $e_{\text{rel}} = \frac{0.0015226006507873535}{0.032761260867118835} \times 100\% \approx 4.645\%$
     \item $e_{\text{lsb}} = \frac{0.0015226006507873535}{0.004285482689738274} \approx 0.355,\ \Delta = 0.004285482689738274$
 \end{itemize}
 
-\gls{lsb} error being < 0.5 is a good sign here, indicating that the boundaries of scale are not overshoot,
-hence providing one factor of reassuring, that quantization was performed adequately,
-without potential errors in scale mismatching, clipping, or encoding/decoding.
+Here, the \gls{lsb} error <0.5 is a good indicator: it suggests that scale boundaries are not exceeded and quantization was applied without mismatches, clipping errors, or encoding/decoding inconsistencies.
 
-Looking at restriction for bias in the Table, an interesting thing can be observed, namelz that it has no own quantization scale based on its observed extrema,
-hence no min and max values for biases are logged by QuantizedWrapperV2 of Conv2D layer.
-Instead its scale is artificially calculated using multiplied layer input scale with per-channel weight scale,
-giving the exact number of bias scales as weight scales per axis (channel).
-This is an engineering decision for acceleration of inference at cost of slight precision loss.
-The thing is, that by multiplying input values with weights, each having its own scale, a new quantization scale is created.
-In order to add bias to the product, its initial \gls{float32} values have to be quantized with this exact same scale.
-It could be quantized with its own scale, then the product result rescaled,
-but this brings a ton of additional computational operations, which will significantly slow down the inference process.
-Instead a fast fixed-point arithmetic is used by calculating the quantized multiplier and using bit shift in order to solve
-this tricky problem coming from multiplying quantized values.
-
-Following calculations can be performed for bias as well, calculating its scale and restoring its approximate \gls{float32} value.
+Bias quantization in Conv2D layers is particularly interesting: the specification shows no independent bias scale. Instead, the bias scale is derived from the product of the input scale and the corresponding per-channel weight scale. This avoids costly rescaling operations during inference, allowing bias addition to be performed directly in fixed-point arithmetic — an elegant speed-accuracy trade-off.
 
 \begin{equation*}
 \text{scale} = 0.003921568859368563 \cdot 0.004285482689738274 = 0.000016805815463440644535387373480262
 \end{equation*}
 
-This value corresponds to the scale in Bias No. 1 symmetric dequantization formula.
-
 \begin{equation*}
 x_{q} \approx 0.000016805815903353505 \cdot 11801 = 0.198325433475474712505
 \end{equation*}
 
-Restored \gls{float32} bias No. 1 value with a reconstruction error from \gls{float32} and quantization inaccuracies.
-
-As it can be seen from Netron analysis, the \gls{bn} \gls{tfop} is split in two basic \glspl{tfop} after qiantization: Mul and Add.
-This is a result of internal structure of \gls{bn} as well as , which can be described using following formula:
+The \gls{bn} \gls{tfop} is split into two simpler operations (Mul and Add) after quantization. This reflects the mathematical structure of batch normalization:
 
 \begin{equation}
 y = \gamma \cdot \frac{x - \mu_{\text{moving}}}{\sqrt{\sigma^2_{\text{moving}} + \epsilon}} + \beta
@@ -521,13 +481,6 @@ A_c = \beta_c - \frac{\gamma_c \cdot \mu_{\text{moving},c}}{\sqrt{\sigma^2_{\tex
 \label{eq:bnquant}
 \end{equation}
 
-Before diving into analysis it has to be mentioned,
-that Mul Input affine dequantization formula is calculated using extrema of outputs of Conv2D No. 1 layer,
-similar to previous calculations of scale an zero-point.
-
-Now, lets dive into analyzing \gls{bn} and why it is represented by two \glspl{tfop} after quantization.
-Fitstly, here is a description of each parameter used in equations:
-
 \begin{itemize}
     \item $x$ — input value to be normalized.
     \item $y$ — output value after batch normalization.
@@ -540,8 +493,7 @@ Fitstly, here is a description of each parameter used in equations:
     \item $A_c$ — per-channel additive term used in quantized inference.
 \end{itemize}
 
-After quantization, the statistical parameters moving mean and moving variance, as well as trained parameters gamma and beta are fused into multiplication and addition paramters,
-hence this split in Mul and Add. Using the provided formulas, \gls{float32} parameters can be reverse-engineered with a certain accuracy loss from their quantized values:
+In quantized form, $\mu_{\text{moving}}$, $\sigma^2_{\text{moving}}$, $\gamma$, and $\beta$ are fused into per-channel multiplier $M_c$ and additive term $A_c$. Reverse-engineering from the quantized values recovers the original parameters with minimal error:
 
 \begin{equation*}
 \begin{gathered}
@@ -561,7 +513,7 @@ A_1 = 0.0339626707136631 \cdot (-113 + 10) \approx -3.4941551 \\
 \end{gathered}
 \end{equation*}
 
-At the end, the Output affine dequantization formula is calculated using extrema of Activation No. 1 layer:
+Finally, the Output affine dequantization formula is derived from the extrema of the Activation No. 1 layer:
 
 \begin{equation*}
 \text{scale} = \frac{18.816810607910156 - (-3.696099329375535 \mathrm{e}{-11})}{127 - (-128)} = 0.07379141414881222
@@ -571,17 +523,18 @@ At the end, the Output affine dequantization formula is calculated using extrema
 \text{zero-point} = \text{round}\left( -128 - \frac{-3.696099329375535 \mathrm{e}{-11}}{\text{scale}} \right) = -128
 \end{equation*}
 
-All further quantization operations of \glspl{tfop} in the model are performed in a similar way,
-with pre-specified restrictions and utilizing repeated methods under the hood.
+All subsequent quantization steps for \glspl{tfop} in the model follow the same general procedure, adhering to predefined constraints and reusing common underlying methods.
 
-By analizing the illustrated information, important quantization methods can be retraced:
+By analyzing the results, the following key quantization principles emerge:
 \begin{itemize}
-  \item After \gls{ptq}, Quantize Input layer defines the quantization scale \dots
+    \item After \gls{ptq}, the \code{Quantize Input} layer defines the input scale and zero-point based on observed extrema.
+    \item Weights are typically quantized per-axis (per-channel) with symmetric ranges.
+    \item Bias scales are derived from input and weight scales, enabling fixed-point computation without extra rescaling.
+    \item Certain operations, such as BatchNorm, are decomposed into simpler arithmetic ops for inference efficiency.
+    \item The precision loss is usually small, and \gls{lsb} error below $0.5$ indicates a well-matched scale.
 \end{itemize}
 
-By taking a closer look on a left \gls{qat} annotated model the \code{QuantizeLayer} can be seen in action,
-which applies the so called "fake" quantization on \code{input\_1} tensor by quantizing it and immediately dequantizing back.
-
+In the \gls{qat} annotated model (left), the \texttt{QuantizeLayer} performs ``fake'' quantization --- quantizing and then immediately dequantizing tensors --- to simulate quantization effects during training.
 
 After the quantized model is saved, the \gls{edgetpu} Compiler is invoked.
 
@@ -591,13 +544,329 @@ Since training may be performed either on a local Windows machine or on a Linux-
 cross-platform automation of the pipeline is ensured by using helper functions and platform detection before invoking the \gls{edgetpu} compiler.
 Because the \gls{edgetpu} compiler can only run on Debian-based Linux systems, the Windows Subsystem for Linux (WSL) is used when working on a Windows machine.
 
-The final result is the \code{quant\_edgetpu.tflite} file --- a quantized, \gls{edgetpu}-compatible model ready for inference.
+\todo{explain in hardware: edgetpu runtime, and maybe moev compiler from design to hardware...}
+
+The \gls{edgetpu} Compiler reads the saved \code{.tflite} model, checks restriction fulfillment and compatibility with \gls{edgetpu} runtime,
+before attempting to fuse all \glspl{tfop} into a single \code{edgetpu-custom-op}.
+Below an example of console log is illustrated, which \gls{edgetpu} Compiler outputs during the process of compilation.
+
+% Define a new style for Edge TPU compiler logs
+\lstdefinestyle{compilerlog}{
+  basicstyle=\normalsize\ttfamily, % can adjust \fontsize{12pt}{13.5pt}
+  captionpos=b,                    % caption at the bottom
+  frame=single,                     % box around the log
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible
+}
+
+% Use the style for this specific log
+\begin{lstlisting}[style=compilerlog,
+    caption={Edge TPU compiler output for the quantized model},
+    label={lst:edgetpu_compilation}]
+Edge TPU Compiler version 16.0.384591198
+Started a compilation timeout timer of 180 seconds.
+
+Model compiled successfully in 898 ms.
+
+Input model: dev/results/run_20250719_170647/quant.tflite
+Input size: 1.90MiB
+Output model: dev/results/run_20250719_170647/quant_edgetpu.tflite
+Output size: 2.07MiB
+On-chip memory used for caching model parameters: 1.90MiB
+On-chip memory remaining for caching model parameters: 3.82MiB
+Off-chip memory used for streaming uncached model parameters: 46.00KiB
+Number of Edge TPU subgraphs: 1
+Total number of operations: 53
+Operation log: dev/results/run_20250719_170647/quant_edgetpu.log
+See the operation log file for individual operation details.
+Compilation child process completed within timeout period.
+Compilation succeeded!
+\end{lstlisting}
+
+\todo{check lstlisting in preliminaries and anywhere else and adjust global settings, so I dont need to use custom compilerlog setting here locally}
+
+The \gls{edgetpu} has $\sim8$ MiB of \gls{sram}, allowing it to cache model's parameter data. %\textasciitilde8~ 
+It is furthermore specified\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#parameter-data-caching}},
+that multiple models can be co-compiled and stored inside \gls{edgetpu} memory. This allows fast switching and inference, if it is required to use different models on one \gls{edgetpu}.
+It is moreover the vice versa methodology possible --- segmenting a model for pipelining on multiple \glspl{edgetpu}. This could allow parallel inference or acceleration of larger models.
+In the scope of this thesis, however, only one \gls{edgetpu} used for implementation work. Therefore ideally, but not necessary, the \gls{edgetpu} \gls{sram} has to be not overfilled,
+enabling faster inference. The use of external memory can negatively affect speed performance, requiring to reload model's parameters.
+
+From this concrete log example important information about memory usage can be backtraced. The model's executable is taking up approximately 8 - 1.90 - 3.82 = 2.28 MiB of \gls{edgetpu} cache.
+While its parameters take 1.90 MiB of cache, leaving 3.82 MiB free, therefore storing an entire model successfully into \gls{edgetpu} \gls{sram}.
+In !!!Evaluation!!! by comparing different models their memory usage will be considered too.
+For this particular model, the 46.00 KiB of external memory was, however, still utilized, despite the availabiklity of remaining free \gls{edgetpu} \gls{sram} memory.
+The reasons behind it could not be found in official documentation, potentionally requiring deeper investigation into compile process, which lies outside the scope of this thesis.
+
+After a successfull compilation the \code{.log} file is saved along with the resulting ready-for-inference on \gls{edgetpu} model.
+This log provides additional information about each \gls{tfop} status of attempt to map it to \gls{edgetpu},
+as illustrated from a \code{.log} example on the right side of an <ref image>.
+
+One way of confirming the full model compilation on the \gls{edgetpu} is to illustrate the resulting compiled model in Netron.
+An example from it of a successfull mapping on every single one \gls{tfop} onto \gls{edgetpu} is illustrated on the left image side <improve this>.
+In contrast to the models before compilation, e.g. illustrated on <ref image>, no additional structural information can be obtained from analyzing the graph.
+This is a result of fusing all regular \glspl{tfop} into a single \code{edgetpu-custom-op}, deemed only to play on \gls{edgetpu}.
+As it can be seen on the image, the input and output tensor shapes can be read off,
+as well as additional information about input and output quantization scales and zero-points can be gathered in a similar way as in \secshortref{subsubsec:optquant}.
+No more information provided.
+
+\begin{minipage}[t]{0.26\textwidth}\vspace{0pt} % check line 552
+    \centering
+    % Scale the image to fit half page width while keeping aspect ratio
+    \includegraphics[width=\linewidth,keepaspectratio]{files/EdgeTPUCompiledModel.pdf}
+    \par\smallskip\footnotesize (a) Model structure diagram. % <-- add this
+\end{minipage}%
+\hspace{0.5cm plus 1fill} % if I use \hfill the overfull disappears 
+\begin{minipage}[t]{0.74\textwidth}\vspace{0pt}
+    \vspace*{\fill}        % push down from top
+    \raggedright           % left-align text inside this block
+    \small
+
+    Edge TPU Compiler version 16.0.384591198\\
+    Input: dev/results/run\_20250719\_170647/quant.tflite\\
+    Output: dev/results/run\_20250719\_170647/quant\_edgetpu.tflite\\
+
+    \vspace{0.5em}
+    \begin{tabular}{@{}lrl@{}}
+      Operator & Count & Status \\[0.5em]  % extra space after header row
+      CONCATENATION & 3  & Mapped to Edge TPU \\
+      LOGISTIC      & 1  & Mapped to Edge TPU \\
+      ADD           & 14 & Mapped to Edge TPU \\
+      MAX\_POOL\_2D & 3  & Mapped to Edge TPU \\
+      MUL           & 14 & Mapped to Edge TPU \\
+      CONV\_2D      & 15 & Mapped to Edge TPU \\
+      TRANSPOSE\_CONV & 3 & Mapped to Edge TPU
+    \end{tabular}
+
+    \par\smallskip\centering\footnotesize (b) Edge TPU compilation summary table. % <-- add this
+    \vspace*{\fill}        % push up from bottom -> vertical centering
+\end{minipage}
+
+\todo{improve description}
+
+The final result is the \gls{edgetpu}-inference ready \code{.tflite} file.
 
 \subsection*{Technical Challenges}
 
+The \gls{devboard} is running on a legacy version of Mendel Linux v...  <check and paste link>, which is the only one latest officialy supported software version for \gls{devboard}.
+With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0 released on <verify version and maybe find date>, exposing a low-level C++ \gls{api}
+for direct interaction with \gls{edgetpu}. Consequently, this library version is the latest officially available in Coral repository for this Mendel Linux release.
+Building the newest one as of today from source requires more complex process using Bazel and potentially breaking dependencies and necessitates debugging,
+which lies outside the scope of this thesis.
+The newest as of today \gls{edgetpu} Compiler version v16.0 was, however, used,
+requiring runtime minimum runtime version v14.0\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#compiler-and-runtime-versions}},
+which was fully compatible with \code{libedgetpu} v16.0.
+
+\todo{explain it inHardware, rename Hardware to Edge Device or something, because explain there Hardware + libedgetpu + Compiler + tflite 2.5 on device}
+
+At a very early development stages, it was, however, not clear, which is the latest supported \gls{tf} version for the provided runtime library and compiler,
+as the related information cannot be found in official documents.
+Hence, heuristically the newest \gls{tf} version v2.19.0 (at the timepoint this work was conducted) was utilized for the first tries of dataset pipeline building,
+model architecting, training and conversion. No \gls{qat} annotation was performed, solely relying on \gls{ptq} before compiling the model for \gls{edgetpu} trial inference.
+At a compile time, the following error from \gls{edgetpu} Compiler was encountered:
+
+\begin{lstlisting}
+Edge TPU Compiler version 16.0.384591198
+ERROR: Didn't find op for builtin opcode 'TRANSPOSE_CONV' version '4'. An older version of this builtin might be supported. Are you using an old TFLite binary with a newer model?
+\end{lstlisting}
+
+To avoid this error, the first idea was to completely omit the use of \code{'TRANSPOSE\_CONV'} \gls{tfop} in the model, relying on a more simple \gls{tfop} combination for deconvolution:
+\code{'UpSampling2D'} + \code{'Conv2D'}, which will affect the model accuracy, but at least could yield acceptable, especially for edge device inference, results. The other idea, however,
+was given a try: the \gls{tf} version was downgraded to v2.5.0 <check if true>, which corresponds to, as mentioned in \secshortref{subsec:hardware},
+\gls{tflite} library version on \gls{devboard}. The rationale behind this decision is to try the best version compatibility combination, taking the edge device as starting point.
+After the downgrade the first successfull compilation and and inference was performed, with the results presented in \secshortref{sec:evaluation}.
+
+Upon introduction of \gls{qat} annotated model layers, the \gls{tfmot} package has to be installed for it. The version used needs to be compatible with \gls{tf} version,
+which at that point was v2.5.0. This necessitated the installation of \gls{tfmot} v0.6.0. At a \gls{tflite} conversion step, during \gls{ptq} the following error keep occuring:
+
+\begin{lstlisting}
+error: 'tfl.max_pool_2d' op quantization parameters violate the same scale constraint: !quant.uniform<i8:f32, 840332.86281612806:-128> vs. !quant.uniform<i8:f32, 0.027852464160498452:-127>
+\end{lstlisting}
+
+\todo{improve looks}
+
+This error reffers to a \code{restriction: Input and outputs must all have same scale/zero\_point} for \code{MAX\_POOL\_2D} layer from a \gls{tflite} specification table,
+mentioned in \secshortref{subsubsec:optquant}. As part of the debugging, it was made sure, that the input and output minimum and maximum value ranges were essentially identical,
+with only mean distributions changing, what is normal for differently distributed sets of batches:
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\small\centering, columns=fullflexible, keepspaces=true, frame=single]
+      ---- INPUT TO MAXPOOL ----
+      Shape: (1, 384, 384, 16)
+      min:   0.0
+      max:   3.411252021789551
+      mean:  1.003772497177124
+\end{lstlisting}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\small\centering, columns=fullflexible, keepspaces=true, frame=single]
+      ---- OUTPUT OF MAXPOOL ----
+      Shape: (1, 192, 192, 16)
+      min:   0.0
+      max:   3.411252021789551
+      mean:  1.0165772438049316
+\end{lstlisting}
+\end{minipage}
 
 
-\todo{Add Netron.app screenshots before and after compilation. Describe and discuss Netron visualizations here. Check for other TODOs above.}
+Furthermore, the sanity check of the value ranges of different input batches was performed, confirming expected values ranging from 0 to $\sim5$,
+without extremely large or small numbers as outliers, hence providing no reason for big scale values, such as \code{840332.86281612806} as can be gathered from error message.
+Activation ranges from the preceding \code{Conv2D} layer were investigated with the help of Netron, showing no conspicuousness as well.
+These investigations are suggesting the internal issue of this specific \gls{tfmot} version, as the input and output data are contradicting the error's message scale calculation.
+
+\todo{explain somewhere at the beginning the importance of Technical Challenges Chapter, saying that it is important for practical reproducibility,
+but if the reader wants pure implementation logic, theyre optional}
+
+During the debugging process was furthermore identified,
+that the similar issue was encountered even on a more later \gls{tfmot} version\footnote{\url{https://github.com/tensorflow/model-optimization/issues/1053}}.
+This information combined with own investigations led to the idea of trying newer \gls{tfmot} version, where this bug was already fixed.
+Concerns about its compatibility with the older \gls{tf} v2.5.0 were raised, since it was needed for \gls{tfop} v3 compatibility mentioned earlier.
+It was decided to prceed, however, due to the absence of documentation of version incompatibility of newer \gls{tfmot} against older \gls{tf}.
+The idea was to try multiple version combinations of these modules.
+
+Picking a combination of newer \gls{tfmot} and \gls{tf} versions resulted in resolving the issue, without making architectural changes to the model.
+This recursively confirmed the the error as internal in \gls{tf} or \gls{tfmot} implementation code, fixed in later releases.
+
+The successfull conversion to \code{.tflite} model format was subsequently achieved. This process, executed internally by new versions of \gls{tf} and \gls{tfmot},
+inserted, however, automatically the \code{Transpose} \gls{tfop} into model architecture. The \code{Transpose} \gls{tfop}, however, was used at no point in model architecting,
+indicating automated intertnal optimization of \gls{qat} annotation by \gls{tfmot}. The reasons for this are unclear,
+with assumption of necessity to transform at some point of the conversion the layer's outputs between two common shape conventions:
+\code{[batch, H, W, C] (NHWC)} and \code{[batch, C, H, W] (NCHW)}. The inability of a certain party, involved in conversion process,
+to handle either of these shapes may request the transformation,
+which is handled with \code{Transpose} \gls{tfop} inserted before \code{TransposeConv} \gls{tfop}. Below the architecture of the same model is illustrated before (left)
+and after \gls{edgetpu} compilation process (right).
+
+\begin{figure}[H]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPartQuantEdgeTPUFail.pdf}
+    \caption{Links}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[height=12cm]{files/modelPartCustomEdgeTPUFail.pdf}
+    \caption{Rechts}
+  \end{subfigure}
+  \caption{Zwei SVGs nebeneinander (als PDF)}
+\end{figure}
+
+The crucial console output part as well as \code{.log} file are provided, indicating the failed attempt to fuse multiple \glspl{tfop} into aspired \code{edgetpu-custom-op}.
+
+\begin{lstlisting}[
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  breaklines=false,      % don't wrap—preserves column layout
+  frame=single,
+  xleftmargin=0pt,
+  linewidth=\textwidth,  % fill the page width
+  caption={Edge TPU compiler output for the quantized model},
+  label={lst:edgetpu_compilation1},
+  captionpos=b
+]
+
+Model successfully compiled but not all operations are supported
+by the Edge TPU. A percentage of the model will instead run on the CPU,
+which is slower. If possible, consider updating your model to use only
+operations supported by the Edge TPU.
+For details, visit g.co/coral/model-reqs.
+Number of operations that will run on Edge TPU: 4
+Number of operations that will run on CPU: 7
+See the operation log file for individual operation details.
+
+Logfile:
+Edge TPU Compiler version 16.0.384591198
+Input: quant.tflite
+Output: quant_edgetpu.tflite
+
+Operator             Count         Status
+      
+CONV_2D              2             More than one subgraph is not supported
+CONV_2D              2             Mapped to Edge TPU
+TRANSPOSE_CONV       1             Filter, bias, or other param is not
+                                   constant at compile-time
+LOGISTIC             1             More than one subgraph is not supported
+ADD                  1             More than one subgraph is not supported
+MAX_POOL_2D          1             Mapped to Edge TPU
+CONCATENATION        1             More than one subgraph is not supported
+TRANSPOSE            1             Tensor has unsupported rank
+                                   (up to 3 innermost dimensions mapped)
+QUANTIZE             1             Mapped to Edge TPU
+\end{lstlisting}
+
+\todo{maybe wrap it better, add or remove some info, ensure consistent style across all work}
+
+This behaviour confirms the inability of multiple model's layers to meet the requirements defined in \secshortref{subsec:hardware},
+as well as confirms the procedure of compilation process in official documentation\footnote{\url{https://coral.ai/docs/edgetpu/models-intro/\#compiling}}.
+That states that the compiler will stop at a first unsopported by \gls{edgetpu} operation and delegate all subsequent operations for CPU execution,
+even if after unsopported \gls{tfop} come the supported for \gls{edgetpu} execution operations. This behaviour is represented on the image below.
+
+\begin{figure}[htbp]
+  \centering
+  % Choose either a width OR a height, or both with keepaspectratio.
+  % Example A: set width only (aspect ratio preserved automatically)
+  \includegraphics[width=0.7\linewidth]{files/compileSequenceEdgeTPU.png}
+
+  % Example B (recommended): limit both max width & height, keep aspect ratio
+  %\includegraphics[
+  %  width=0.9\linewidth,
+  %  height=0.5\textheight,
+  %  keepaspectratio
+  %]{images/example.png}
+
+  \caption{Descriptive caption for the image (what the figure shows).}
+  \label{fig:compileSeqEdgeTPU}
+\end{figure}
+
+The delegation of tensor operations to CPU will almost certainly drastically increase the inference time,
+which is inappropriate in the scope of the work, aspiring to map the entire model on \gls{edgetpu}.
+
+As the process of \code{Transpose} \gls{tfop} insertion is happening completely internally and automatically,
+there is no possibility to affect this or to explicitly set the layer's parameters to be constant at compile-time and of shape <3, as required by \gls{edgetpu} Compiler.
+
+There are again two ideas could be realised. Avoid the use of \code{TransposeConv} or to continue the search for compatible \gls{tf} and \gls{tfmot} versions.
+By choosing the second idea, the one is caught between a rock and a hard place. On the one hand the \gls{tf} version has to be kept as low as possible for the best compatibility with
+\gls{tflite} on the edge device and to avoid encountering the \code{TRANSPOSE\_CONV version 4} compiler error, described earlier. On the other hand the version of \gls{tf} and \gls{tfmot}
+has to be high enough to contain the fixed bug of scale incompatibility, encountered earlier. With this in mind, the following approach was chosen: find the highest \gls{tf} version,
+which is still utilizing the v3 of \code{TransposeConv} \gls{tfop}. This approach, however is highly relying on the assumption, that all other newer \glspl{tfop},
+probably introduced in newer \gls{tf} version, will not encounter compiling problems, as well as be compatible with the older \gls{tflite} v2.5.0 on an inference device.
+Because essentially, if the \gls{edgetpu} Compiler successfully fuses every \gls{tfop} into \code{edgetpu-custom-op},
+the \gls{tflite} runtime v2.5.0 is required to only be able to parse and load the model until it is delegated over to \gls{edgetpu}.
+So in this case, it is more relied on the compiler as the last instance to check the general compatibility before running inference.
+Hence the certain compatibility unsureness is still existing, which presence has to be considered when using new (possibly custom) layer types.
+But in the scope of this work to achieve the objective this assumption is deemed as sufficient.
+
+Given the absence of the official documentation about such detailed information of \glspl{tfop},
+the search for the compatible \code{TransposeConv} \gls{tfop} was only possible by investigating the contents of \code{register.cc} file,
+located in \gls{tf} repository in the folder \code{tensorflow/tensorflow/lite/kernels}. It is important to mention,
+that in different \gls{tf} versions this file can be present in a slightly different folders, but in a close vicinity to the provided path.
+The newest \gls{tf} version with a \code{TransposeConv} v3 is found out to be v2.10.0. The corresponding lines of \code{register.cc} are:
+
+\begin{lstlisting}
+AddBuiltin(BuiltinOperator_TRANSPOSE_CONV, Register_TRANSPOSE_CONV(),
+           /* min_version = */ 1,
+           /* max_version = */ 3);
+\end{lstlisting}
+
+It turned out, that the newest \gls{tfmot} v0.8.0 is backward compatible with \gls{tf} v2.10.0, despite being tested against \gls{tf} 2.14.1,
+as can be confirmed on official releases page\footnote{\url{https://github.com/tensorflow/model-optimization/releases}}.
+
+The problem of such version incompatibilities is presumably stemming from introducing the newer version of \code{libedgetpu} runtime library,
+while keeping the old \gls{tflite} version on a \gls{devboard}, without providing an official possibility to upgrade and even out the versions.
+This, as proven here, could be misleading and confusing when the one faced with the choice of inter-compatibility of multiple required packages.
+Especially when newer improved versions of some of these packages have become available in the meantime.
+
+At the end, the version combination \gls{tf} v2.10.0 and \gls{tfmot} v0.8.0 resolved all previous errors and led to successfull compilation of model,
+fully mapping all \glspl{tfop} to \gls{edgetpu}, as it is presented in <ref image here!>.
+This setup was subsequently used later on during the full process of the pipeline utilization in the scope of this work.
+
+\todo{requirements mention somewhere}
 
 \section{Deployment}
 \label{sec:deployment}
@@ -605,6 +874,7 @@ The final result is the \code{quant\_edgetpu.tflite} file --- a quantized, \gls{
 
 
 \section{Evaluation}
+\label{sec:evaluation}
 
 \todo{Smooth transition to evaluation chapter! Very nice!}
 
