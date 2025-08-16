@@ -14,7 +14,7 @@ from pathlib import Path
 
 batchSize         = 1
 imgSize           = (192,192)
-numFilters        = 26
+numFilters        = 32
 numEpochs         = 1
 modelArchitecture = cloudNetQ
 valRatio          = 0.2

@@ -485,12 +485,10 @@ def cloudNetQ(batchShape, filters=32):
     inputs = Input(batch_shape=batchShape)
 
     # Encoder (4 blocks)
-    # 16-filter stem (paper-like, cheap)
     stem = quantize_annotate_layer(
         Conv2D(16, 3, padding='same', activation='relu', name="stem_conv16")
     )(inputs)
 
-    # now feed stem into your first encoder block
     c1 = quantConvBlock(stem, filters, name="enc1")
     p1 = MaxPooling2D((2, 2), name="pool1")(c1)
 
@@ -503,7 +501,7 @@ def cloudNetQ(batchShape, filters=32):
     c4 = quantConvBlock(p3, filters*8, name="enc4")
     p4 = MaxPooling2D((2, 2), name="pool4")(c4)
 
-    c5 = bottleneckResidualDropoutQ(p4, filters*16, name="bottleneck", dropoutRate=0.15)  # 4th (bottleneck)
+    c5 = bottleneckResidualDropoutQ(p4, filters*13, name="bottleneck", dropoutRate=0.15)
 
     # Decoder (4 up blocks, hybrid simplification)
     u4 = quantize_annotate_layer(
@@ -540,16 +538,7 @@ def cloudNetQ(batchShape, filters=32):
         Conv2DTranspose(filters, (2, 2), strides=(2, 2), padding='same', name="up1")
     )(d2)
     u1 = Concatenate(name="concat1")([u1, c1])
-    d1 = quantize_annotate_layer(
-        Conv2D(filters, 3, padding='same', name="dec1_conv1")
-    )(u1)
-    d1 = BatchNormalization(name="dec1_bn1")(d1)
-    d1 = Activation('relu', name="dec1_act1")(d1)
-    d1 = quantize_annotate_layer(
-        Conv2D(filters, 3, padding='same', name="dec1_conv2")
-    )(d1)
-    d1 = BatchNormalization(name="dec1_bn2")(d1)
-    d1 = Activation('relu', name="dec1_act2")(d1)
+    d1 = quantConvBlock(u1, filters, name="dec1")
 
     outputs = quantize_annotate_layer(
         Conv2D(1, (1, 1), activation='sigmoid', name="output")
