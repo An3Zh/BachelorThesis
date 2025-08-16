@@ -12,10 +12,11 @@ from evaluate import evaluatePRC
 from pathlib import Path
 
 
-batchSize         = 4
+batchSize         = 1
 imgSize           = (192,192)
+numFilters        = 26
 numEpochs         = 1
-modelArchitecture = simpleQ
+modelArchitecture = cloudNetQ
 valRatio          = 0.2
 trainValDSSize    = 100
 numCalBatches     = 1
@@ -24,7 +25,7 @@ numCalBatches     = 1
  valSteps, testDS, singleSceneID) = buildDS(includeTestDS=False, batchSize=batchSize, 
                                             imgSize=imgSize, valRatio=valRatio, trainValDSSize=trainValDSSize)
 
-model   = modelArchitecture(batchShape=(batchSize, *imgSize, 4))
+model   = modelArchitecture(batchShape=(batchSize, *imgSize, 4), filters=numFilters)
 model.summary()
 
 now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -87,6 +88,6 @@ with open(f'{runFolder}/val_threshold.json', "w") as f:
 
 print(f"Validation PRC → τ* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_threshold.json)")
 
-model = asBatchOne(model, modelArchitecture, imgSize)
+model = asBatchOne(model, modelArchitecture, imgSize, numFilters)
 model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)
 convertToEdge(runFolder)
