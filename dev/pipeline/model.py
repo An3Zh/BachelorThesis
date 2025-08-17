@@ -546,8 +546,7 @@ def cloudNetQ(batchShape, filters=32):
 
     model = Model(inputs, outputs)
     model = quantize_apply(model)
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.MeanIoU(num_classes=2), diceCoefficient, Precision(), Recall()])
-
+    
     return model
 
 # Example usage
