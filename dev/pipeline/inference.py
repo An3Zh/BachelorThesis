@@ -14,11 +14,12 @@ from pathlib import Path
 
 # --- Config ---
 batchSize     = 16
-imgSize       = (192, 192)
+imgSize       = None #(192, 192)
 singleSceneID = None            # None → full test set (all scenes)
 Upsample      = imgSize is not None           # set True if you want per-patch upsampling
+print(Upsample)
 BaseFolder    = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
-runFolder     = BaseFolder / "run_20250719_170647"
+runFolder     = BaseFolder / "run_20250817_130734_3ch_384"
 modelPath     = runFolder / "endModel.h5"
 saveFolder    = runFolder / "evaluation" / "inference"
 
