@@ -58,47 +58,50 @@ numCalBatches     = 64      # more batches => better PTQ calibration
 
 # Optional: lightweight augmentation (applied on batches)
 def augmentBatch(xBatch, yBatch):
-    def _aug(x, y):
-        # ---------------- Flips ----------------
-        flipH = tf.random.uniform([]) < 0.5
-        flipV = tf.random.uniform([]) < 0.5
-        x2 = tf.cond(flipH, lambda: tf.image.flip_left_right(x), lambda: x)
-        y2 = tf.cond(flipH, lambda: tf.image.flip_left_right(y[..., tf.newaxis]), lambda: y[..., tf.newaxis])
-        y2 = tf.squeeze(y2, -1)
-        x3 = tf.cond(flipV, lambda: tf.image.flip_up_down(x2), lambda: x2)
-        y3 = tf.cond(flipV, lambda: tf.image.flip_up_down(y2[..., tf.newaxis]), lambda: y2[..., tf.newaxis])
-        y3 = tf.squeeze(y3, -1)
+    seed = tf.random.uniform([2], maxval=2**31-1, dtype=tf.int32)
 
-        # ---------------- Rotations ----------------
-        doRotate = tf.random.uniform([]) < 0.5
-        ifRotate = lambda: tf.image.rot90(x3, k=tf.random.uniform([], minval=0, maxval=4, dtype=tf.int32))
-        ifRotateMask = lambda: tf.image.rot90(y3[..., tf.newaxis], k=tf.random.uniform([], minval=0, maxval=4, dtype=tf.int32))
-        x4 = tf.cond(doRotate, ifRotate, lambda: x3)
-        y4 = tf.cond(doRotate, ifRotateMask, lambda: y3[..., tf.newaxis])
-        y4 = tf.squeeze(y4, -1)
+    # ensure mask has channel dim
+    if yBatch.shape.rank == 3:
+        yBatch = yBatch[..., tf.newaxis]
 
-        # ---------------- Random crop + resize ----------------
-        doCrop = tf.random.uniform([]) < 0.5
-        cropFrac = 0.9  # keep 90% of area
-        cropSize = [tf.cast(tf.shape(x4)[0] * cropFrac, tf.int32),
-                    tf.cast(tf.shape(x4)[1] * cropFrac, tf.int32)]
-        ifCrop = lambda: (tf.image.resize(tf.image.random_crop(x4, size=[cropSize[0], cropSize[1], 4]), (192, 192)),
-                          tf.image.resize(tf.image.random_crop(y4[..., tf.newaxis], size=[cropSize[0], cropSize[1], 1]), (192, 192)))
-        ifNoCrop = lambda: (x4, y4[..., tf.newaxis])
-        x5, y5 = tf.cond(doCrop, ifCrop, ifNoCrop)
-        y5 = tf.squeeze(y5, -1)
+    # flips (same seeds for x/y)
+    xBatch = tf.image.stateless_random_flip_left_right(xBatch, seed=seed)
+    yBatch = tf.image.stateless_random_flip_left_right(yBatch, seed=seed)
 
-        # ---------------- Brightness/contrast ----------------
-        x5 = tf.image.random_brightness(x5, max_delta=0.05)
-        x5 = tf.image.random_contrast(x5, lower=0.95, upper=1.05)
-        x5 = tf.clip_by_value(x5, 0.0, 1.0)
+    xBatch = tf.image.stateless_random_flip_up_down(xBatch, seed=seed + 1)
+    yBatch = tf.image.stateless_random_flip_up_down(yBatch, seed=seed + 1)
 
-        return x5, y5
+    # 0/90/180/270 rotation (mask-safe)
+    k = tf.random.stateless_uniform([], minval=0, maxval=4, dtype=tf.int32, seed=seed + 2)
+    xBatch = tf.image.rot90(xBatch, k)
+    yBatch = tf.image.rot90(yBatch, k)
 
-    xBatch, yBatch = tf.map_fn(lambda z: _aug(z[0], z[1]),
-                               (xBatch, yBatch),
-                               fn_output_signature=(tf.float32, tf.float32))
-    return xBatch, yBatch
+    # random crop (one box for the whole batch → tiny & fast)
+    def applyCrop(x, y):
+        cropFrac = tf.constant(0.9, tf.float32)  # keep 90% area
+        y1 = tf.random.stateless_uniform([], seed=seed + 3, minval=0.0, maxval=1.0 - cropFrac)
+        x1 = tf.random.stateless_uniform([], seed=seed + 4, minval=0.0, maxval=1.0 - cropFrac)
+        y2, x2 = y1 + cropFrac, x1 + cropFrac
+
+        bsz = tf.shape(x)[0]
+        boxes = tf.tile(tf.reshape(tf.stack([y1, x1, y2, x2]), [1, 4]), [bsz, 1])
+        boxIdx = tf.range(bsz)
+
+        # keep original HxW after crop
+        targetSize = tf.shape(x)[1:3]
+        x = tf.image.crop_and_resize(x, boxes, boxIdx, targetSize, method='bilinear')
+        y = tf.image.crop_and_resize(y, boxes, boxIdx, targetSize, method='nearest')
+        return x, y
+
+    doCrop = tf.random.stateless_uniform([], seed=seed + 5) > 0.5
+    xBatch, yBatch = tf.cond(doCrop, lambda: applyCrop(xBatch, yBatch), lambda: (xBatch, yBatch))
+
+    # photometric (image only)
+    xBatch = tf.image.stateless_random_brightness(xBatch, max_delta=0.05, seed=seed + 6)
+    xBatch = tf.image.stateless_random_contrast(xBatch, lower=0.95, upper=1.05, seed=seed + 7)
+    xBatch = tf.clip_by_value(xBatch, 0.0, 1.0)
+
+    return xBatch, tf.squeeze(yBatch, -1)
 
 # apply augmentation only to training stream
 trainDS = trainDS.map(augmentBatch, num_parallel_calls=tf.data.AUTOTUNE)
@@ -149,16 +152,16 @@ model.compile(
 # Callbacks
 # -----------------------------
 checkpoint = ModelCheckpoint(
-    f'{runFolder}/modelCheckpoint.h5',
+    filepath=f'{runFolder}/ckpt',
     monitor='val_diceCoefficient', mode='max',
-    save_best_only=True, verbose=1
+    save_best_only=True, save_weights_only=True, verbose=1
 )
 earlyStop = EarlyStopping(
     monitor='val_diceCoefficient', mode='max',
-    patience=10, restore_best_weights=True
+    patience=12, restore_best_weights=True, verbose=1
 )
 lrReduce = ReduceLROnPlateau(
-    monitor='val_loss', factor=0.2, patience=4,
+    monitor='val_loss', factor=0.2, patience=6,
     min_lr=1e-6, verbose=1
 )
 
@@ -199,6 +202,7 @@ history = model.fit(
 )
 
 model.save(f'{runFolder}/endModel.h5')
+model.save(f'{runFolder}/endModel')
 print('-' * 40)
 print('Training end, model saved successfully!')
 print('-' * 40)
