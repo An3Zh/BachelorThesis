@@ -35,13 +35,13 @@ class Tee(object):
 # -----------------------------
 # Config (tune as needed)
 # -----------------------------
-batchSize         = 4      # increase if memory allows; if dropping to 1–2, consider freezing BN
+batchSize         = 16      # increase if memory allows; if dropping to 1–2, consider freezing BN
 imgSize           = (192, 192)
 numFilters        = 32
 numEpochs         = 1
 modelArchitecture = cloudNetQ
 valRatio          = 0.2
-trainValDSSize    = 100    # raise above debug values if you have data
+trainValDSSize    = 5155    # raise above debug values if you have data
 numCalBatches     = 1      # more batches => better PTQ calibration
 
 # -----------------------------
