@@ -36,7 +36,8 @@ class Tee(object):
 # Config (tune as needed)
 # -----------------------------
 batchSize         = 16      # increase if memory allows; if dropping to 1–2, consider freezing BN
-imgSize           = (192, 192)
+imgSize           = None
+imgSizeArch       = (384, 384)
 numFilters        = 32
 numEpochs         = 1
 modelArchitecture = cloudNetQ
@@ -121,7 +122,7 @@ sys.stderr = tee
 # -----------------------------
 # Model
 # -----------------------------
-model = modelArchitecture(batchShape=(batchSize, *imgSize, 4), filters=numFilters)
+model = modelArchitecture(batchShape=(batchSize, *imgSizeArch, 4), filters=numFilters)
 model.summary()
 
 shutil.copy('dev/pipeline/model.py', f'{runFolder}/my_model.py')
@@ -158,7 +159,7 @@ checkpoint = ModelCheckpoint(
 )
 earlyStop = EarlyStopping(
     monitor='val_diceCoefficient', mode='max',
-    patience=12, restore_best_weights=True, verbose=1
+    patience=15, restore_best_weights=True, verbose=1
 )
 lrReduce = ReduceLROnPlateau(
     monitor='val_loss', factor=0.2, patience=6,
@@ -179,7 +180,7 @@ run_config = {
     "val_steps": int(valSteps),
     "random_seed": SEED,
     "model_architecture": modelArchitecture.__name__,
-    "img_size": imgSize,
+    "img_size": imgSizeArch,
 }
 with open(f'{runFolder}/experiment_config.json', "w") as f:
     json.dump(run_config, f, indent=4, default=str)
@@ -198,7 +199,7 @@ history = model.fit(
     steps_per_epoch=trainSteps,
     validation_steps=valSteps,
     validation_freq=1,   # validate every epoch so callbacks work optimally
-    verbose=1
+    verbose=2
 )
 
 model.save(f'{runFolder}/endModel.h5')
@@ -233,6 +234,6 @@ print(f"Validation PRC -> Thr* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_
 # -----------------------------
 # Export for edge
 # -----------------------------
-model = asBatchOne(model, modelArchitecture, imgSize, numFilters)
+model = asBatchOne(model, modelArchitecture, imgSizeArch, numFilters)
 model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)
 convertToEdge(runFolder)

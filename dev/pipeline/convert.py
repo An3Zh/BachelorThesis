@@ -60,7 +60,7 @@ def convertToEdge(runFolder):
         # Native Linux—use standard paths
         command = [
             "edgetpu_compiler",
-            tflite_path, "-o", output_dir
+            tflite_path, "-t 360", "-o", output_dir
         ]
     else:
         raise RuntimeError(f"Unsupported platform: {system_type}")
