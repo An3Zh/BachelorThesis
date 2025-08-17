@@ -6,7 +6,7 @@ from tqdm import tqdm
 import math
 import time
 import os
-from model import softJaccardLoss, diceCoefficient
+from model import softJaccardLoss, diceCoefficient, diceLoss
 from tensorflow_model_optimization.quantization.keras import quantize_scope
 import tensorflow.image as tfi
 from PIL import Image
@@ -34,11 +34,15 @@ saveFolder    = runFolder / "evaluation" / "inference"
 sceneGridSizes = getSceneGridSizes()
 
 # --- Load Model ---
+def bceDiceLoss(yTrue, yPred):
+    return tf.keras.losses.binary_crossentropy(yTrue, yPred) + 0.5 * diceLoss(yTrue, yPred)
+
 with quantize_scope():
     model = tf.keras.models.load_model(
         modelPath,
         custom_objects={'softJaccardLoss': softJaccardLoss,
-                        'diceCoefficient': diceCoefficient}
+                        'diceCoefficient': diceCoefficient,
+                        'bceDiceLoss'    : bceDiceLoss}
     )
 
 os.makedirs(saveFolder, exist_ok=True)
