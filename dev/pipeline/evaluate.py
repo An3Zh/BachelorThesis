@@ -125,8 +125,8 @@ def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
             # Unpad
             predUnp = unpadToMatch(pred, gt)
             unpNpy = unpDir / f"unpadded_scene_{sceneId}.npy"
-            np.save(unpNpy, predUnp)
-            savePngGray(unpNpy.with_suffix(".png"), predUnp)
+            #np.save(unpNpy, predUnp)
+            #savePngGray(unpNpy.with_suffix(".png"), predUnp)
 
             # Threshold selection
             if fixedThreshold is not None:
@@ -138,7 +138,7 @@ def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
             # Binarize
             binMask = (predUnp >= thr).astype(np.uint8)
             binNpy = binDir / f"binmask_scene_{sceneId}.npy"
-            np.save(binNpy, binMask)
+            #np.save(binNpy, binMask)
             savePngBinary(binNpy.with_suffix(".png"), binMask)
 
             # Metrics
@@ -162,7 +162,7 @@ def evaluateAll(runDir: Path, gtBase: Path, fixedThreshold: float = None):
 
 if __name__ == "__main__":
     BaseFolder = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
-    runDir = BaseFolder / "run_20250719_170647"
+    runDir = BaseFolder / "run_20250817_143934_4ch_384"
     # raw strings cannot end with a single backslash → drop it
     gtBase = Path(r"C:\Users\aleks\Documents\An3BA\dev\pipeline\Data\38-Cloud_test\Entire_scene_gts")
-    evaluateAll(runDir, gtBase)#, fixedThreshold=0.27384504675865173)
+    evaluateAll(runDir, gtBase)#, fixedThreshold=0.33622974157333374)

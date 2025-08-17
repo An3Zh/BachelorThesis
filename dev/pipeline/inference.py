@@ -6,7 +6,7 @@ from tqdm import tqdm
 import math
 import time
 import os
-from model import softJaccardLoss, diceCoefficient
+from model import softJaccardLoss, diceCoefficient, diceLoss
 from tensorflow_model_optimization.quantization.keras import quantize_scope
 import tensorflow.image as tfi
 from PIL import Image
@@ -14,11 +14,11 @@ from pathlib import Path
 
 # --- Config ---
 batchSize     = 16
-imgSize       = (192, 192)
+imgSize       = None #(192, 192)
 singleSceneID = None            # None → full test set (all scenes)
 Upsample      = imgSize is not None           # set True if you want per-patch upsampling
 BaseFolder    = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
-runFolder     = BaseFolder / "run_20250719_170647"
+runFolder     = BaseFolder / "run_20250817_143934_4ch_384"
 modelPath     = runFolder / "endModel.h5"
 saveFolder    = runFolder / "evaluation" / "inference"
 
@@ -34,11 +34,15 @@ saveFolder    = runFolder / "evaluation" / "inference"
 sceneGridSizes = getSceneGridSizes()
 
 # --- Load Model ---
+def bceDiceLoss(yTrue, yPred):
+    return tf.keras.losses.binary_crossentropy(yTrue, yPred) + 0.5 * diceLoss(yTrue, yPred)
+
 with quantize_scope():
     model = tf.keras.models.load_model(
         modelPath,
         custom_objects={'softJaccardLoss': softJaccardLoss,
-                        'diceCoefficient': diceCoefficient}
+                        'diceCoefficient': diceCoefficient,
+                        'bceDiceLoss'    : bceDiceLoss}
     )
 
 os.makedirs(saveFolder, exist_ok=True)
