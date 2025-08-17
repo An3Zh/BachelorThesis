@@ -142,9 +142,9 @@ infResult inference() {
     std::cout << "Scene " << sceneId << ": Found correct number of patches (" << fileCount << ")\n";
 
     // ---- Model inference ---- (unchanged)
-    const int batch = 1, height = 192, width = 192, channels = 4;
+    const int batch = 1, height = 384, width = 384, channels = 3;
     const int inputElements = batch * height * width * channels;
-    auto model = tflite::FlatBufferModel::BuildFromFile((modelRoot + "/good.tflite").c_str());
+    auto model = tflite::FlatBufferModel::BuildFromFile((modelRoot + "/3CH_384.tflite").c_str());
     tflite::ops::builtin::BuiltinOpResolver resolver;
     resolver.AddCustom(edgetpu::kCustomOp, edgetpu::RegisterCustomOp());
     std::unique_ptr<tflite::Interpreter> interpreter;

@@ -163,7 +163,7 @@ int main() {
     std::string outputRoot = "/mnt/sdcard/output/stitched";
     std::string inputFolder = inputRoot + "/" + sceneFolderName(sceneId);
 
-    int patchHeight = 192, patchWidth = 192;
+    int patchHeight = 384, patchWidth = 384;
 
     std::ostringstream oss;
     oss << outputRoot << "/stitched_scene_" << sceneId << ".bin";
