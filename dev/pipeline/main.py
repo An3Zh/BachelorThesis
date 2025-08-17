@@ -152,7 +152,7 @@ model.compile(
 # Callbacks
 # -----------------------------
 checkpoint = ModelCheckpoint(
-    filepath=f'{runFolder}/ckpt',
+    filepath=f'{runFolder}/ckpt.h5',
     monitor='val_diceCoefficient', mode='max',
     save_best_only=True, save_weights_only=True, verbose=1
 )
