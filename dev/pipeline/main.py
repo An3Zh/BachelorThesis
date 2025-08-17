@@ -35,14 +35,14 @@ class Tee(object):
 # -----------------------------
 # Config (tune as needed)
 # -----------------------------
-batchSize         = 16      # increase if memory allows; if dropping to 1–2, consider freezing BN
+batchSize         = 4      # increase if memory allows; if dropping to 1–2, consider freezing BN
 imgSize           = (192, 192)
 numFilters        = 32
-numEpochs         = 200
+numEpochs         = 1
 modelArchitecture = cloudNetQ
 valRatio          = 0.2
-trainValDSSize    = 5155    # raise above debug values if you have data
-numCalBatches     = 64      # more batches => better PTQ calibration
+trainValDSSize    = 100    # raise above debug values if you have data
+numCalBatches     = 1      # more batches => better PTQ calibration
 
 # -----------------------------
 # Data
@@ -198,11 +198,11 @@ history = model.fit(
     steps_per_epoch=trainSteps,
     validation_steps=valSteps,
     validation_freq=1,   # validate every epoch so callbacks work optimally
-    verbose=2
+    verbose=1
 )
 
 model.save(f'{runFolder}/endModel.h5')
-model.save(f'{runFolder}/endModel')
+#model.save(f'{runFolder}/endModel')
 print('-' * 40)
 print('Training end, model saved successfully!')
 print('-' * 40)
