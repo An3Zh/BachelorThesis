@@ -121,7 +121,7 @@ sys.stderr = tee
 # -----------------------------
 # Model
 # -----------------------------
-model = modelArchitecture(batchShape=(batchSize, *imgSize, 4), filters=numFilters)
+model = modelArchitecture(batchShape=(batchSize, *imgSize, 3), filters=numFilters)
 model.summary()
 
 shutil.copy('dev/pipeline/model.py', f'{runFolder}/my_model.py')
@@ -236,3 +236,5 @@ print(f"Validation PRC -> Thr* = {bestThr:.6f}, F1 = {bestF1:.4f} (saved to val_
 model = asBatchOne(model, modelArchitecture, imgSize, numFilters)
 model = ConvertToTflite(model, runFolder, imgSize, numCalBatches)
 convertToEdge(runFolder)
+
+log_file.close()

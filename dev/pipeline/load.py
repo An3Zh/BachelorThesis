@@ -14,7 +14,7 @@ def getFolders(baseDir: Path) -> Tuple[Dict[str, Path], Dict[str, Path]]:
         "red":   baseDir / "38-Cloud_training" / "train_red",
         "green": baseDir / "38-Cloud_training" / "train_green",
         "blue":  baseDir / "38-Cloud_training" / "train_blue",
-        "nir":   baseDir / "38-Cloud_training" / "train_nir",
+        #"nir":   baseDir / "38-Cloud_training" / "train_nir",
         "gt":    baseDir / "38-Cloud_training" / "train_gt",
     }
 
@@ -22,7 +22,7 @@ def getFolders(baseDir: Path) -> Tuple[Dict[str, Path], Dict[str, Path]]:
         "red":   baseDir / "38-Cloud_test" / "test_red",
         "green": baseDir / "38-Cloud_test" / "test_green",
         "blue":  baseDir / "38-Cloud_test" / "test_blue",
-        "nir":   baseDir / "38-Cloud_test" / "test_nir",
+        #"nir":   baseDir / "38-Cloud_test" / "test_nir",
     }
 
     return trainFolders, testFolders
@@ -53,25 +53,28 @@ def getPaths(
     isTestDS: Optional[bool] = False,
 ) -> Union[
     Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor],
-    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]
+    Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]
 ]:
     
     red   = tf.strings.join([str(folders["red"]),    "/", "red_",   filename, ".TIF"])
     green = tf.strings.join([str(folders["green"]),  "/", "green_", filename, ".TIF"])
     blue  = tf.strings.join([str(folders["blue"]),   "/", "blue_",  filename, ".TIF"])
-    nir   = tf.strings.join([str(folders["nir"]),    "/", "nir_",   filename, ".TIF"])
+    #nir   = tf.strings.join([str(folders["nir"]),    "/", "nir_",   filename, ".TIF"])
     
     if isTestDS:
-        return red, green, blue, nir, filename
+        #return red, green, blue, nir, filename
+        return red, green, blue, filename
     else:
         gt    = tf.strings.join([str(folders["gt"]), "/", "gt_",    filename, ".TIF"])
-        return red, green, blue, nir, gt
+        #return red, green, blue, nir, gt
+        return red, green, blue, gt
+    
 
 def loadDS(
     red: tf.Tensor,
     green: tf.Tensor,
     blue: tf.Tensor,
-    nir: tf.Tensor,
+    #nir: tf.Tensor,
     gt: Optional[tf.Tensor] = None,
     filename: Optional[tf.Tensor] = None,
     imgSize: Optional[Tuple[int, int]] = None) -> Union[tf.Tensor, Tuple[tf.Tensor, tf.Tensor]]:
@@ -79,9 +82,10 @@ def loadDS(
     r  = loadTIF(red)
     g  = loadTIF(green)
     b  = loadTIF(blue)
-    n  = loadTIF(nir)
+    #n  = loadTIF(nir)
 
-    x = tf.stack([r, g, b, n], axis=-1)                     # [H,W,4], uint16
+    #x = tf.stack([r, g, b, n], axis=-1)                     # [H,W,4], uint16
+    x = tf.stack([r, g, b], axis=-1) 
     x = tf.cast(x, tf.float32) / 65535.0                    # [0,1] float32
     if imgSize is not None:
         x = tf.image.resize(x, imgSize, method='bilinear')                     # [192,192,4]
@@ -127,7 +131,8 @@ def buildDS(
     trainFolders, testFolders = getFolders(baseDir)
 
     trainValPathsFn = lambda filename: getPaths(filename, trainFolders)
-    trainValLoadFn  = lambda r, g, b, n, gt: loadDS(r, g, b, n, gt, imgSize=imgSize)
+    #trainValLoadFn  = lambda r, g, b, n, gt: loadDS(r, g, b, n, gt, imgSize=imgSize)
+    trainValLoadFn  = lambda r, g, b, gt: loadDS(r, g, b, gt, imgSize=imgSize)
 
     # Retrieve both train and val datasets from .csv
     trainValDS = tf.data.TextLineDataset(str(csvTrainVal)).skip(1)
@@ -169,7 +174,8 @@ def buildDS(
 
 
         testPathsFn = lambda filename: getPaths(filename, testFolders, isTestDS=True)
-        testLoadFn  = lambda r, g, b, n, filename: loadDS(r, g, b, n, imgSize=imgSize, filename=filename)
+        #testLoadFn  = lambda r, g, b, n, filename: loadDS(r, g, b, n, imgSize=imgSize, filename=filename)
+        testLoadFn  = lambda r, g, b, filename: loadDS(r, g, b, imgSize=imgSize, filename=filename)
         testDS = tf.data.TextLineDataset(str(csvTest)).skip(1)
         #testDS = testDS.shuffle(testDSSize, seed, reshuffle_each_iteration=False) DO NOT SHUFFLE, unless you are saving new .csv, used later for stitching order
         testDS = testDS.map(testPathsFn, num_parallel_calls=tf.data.AUTOTUNE)
@@ -241,15 +247,16 @@ if __name__ == "__main__":
             axs[1].set_title("Green")
             axs[2].imshow(xb[i, :, :, 2], cmap='Blues')
             axs[2].set_title("Blue")
-            axs[3].imshow(xb[i, :, :, 3], cmap='gray')
-            axs[3].set_title("NIR")
+            #axs[3].imshow(xb[i, :, :, 3], cmap='gray')
+            #axs[3].set_title("NIR")
             axs[4].imshow(mb[i], cmap='gray', vmin=0, vmax=1)
             axs[4].set_title("Mask")
             for ax in axs:
                 ax.axis('off')
             plt.tight_layout()
-            plt.savefig(f"train_vis/train_batch_0_sample_{i}.png")
-            plt.close(fig)
+            #plt.savefig(f"train_vis/train_batch_0_sample_{i}.png")
+            #plt.close(fig)
+            plt.show()
 
     # --- Validation batch ---
     for xb, mb in valDS.take(1):
@@ -264,12 +271,13 @@ if __name__ == "__main__":
             axs[1].set_title("Green")
             axs[2].imshow(xb[i, :, :, 2], cmap='Blues')
             axs[2].set_title("Blue")
-            axs[3].imshow(xb[i, :, :, 3], cmap='gray')
-            axs[3].set_title("NIR")
+            #axs[3].imshow(xb[i, :, :, 3], cmap='gray')
+            #axs[3].set_title("NIR")
             axs[4].imshow(mb[i], cmap='gray', vmin=0, vmax=1)
             axs[4].set_title("Mask")
             for ax in axs:
                 ax.axis('off')
             plt.tight_layout()
-            plt.savefig(f"val_vis/val_batch_0_sample_{i}.png")
-            plt.close(fig)
+            #plt.savefig(f"val_vis/val_batch_0_sample_{i}.png")
+            #plt.close(fig)
+            plt.show()
