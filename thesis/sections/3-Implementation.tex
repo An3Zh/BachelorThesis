@@ -1038,6 +1038,31 @@ The necessary include files are provided in git and can also be investigated in 
 After all compilator and linker issues were resolved and requirements satisfied, the successfull model loading and tensor allocation using C++ \gls{api}
 marked the last technical milestone of this work.
 
+\subsubsection*{Unresolved error}
+
+In the scope of this work and regarding to the specific \gls{devboard} with its specific installed Mendel Linux OS and the modules an interesting
+behaviour after inference could not remain unnoticed.
+From the early development stages and up to the final improvements of C++ inference in the scope of this thesis, one of the two following errors persistendly
+kept appearing always after (!) the inference was completed: "Segmentation fault" or "Bus error". First it was encountered during the simple proof-of-concept
+Python inference, at the end of the program, after successfully saved inference results. Being disasterous for a programmer by its nature,
+but strangely appearing at program's closing, these errors had no effect on obtaining the required inference results. Clearly stemming from C++ background code
+and thus providing no way for debugging them in Python, these errors allowed further development of pipeline having no effect on the required results.
+The idea of C++ inference implementation was, however, further fueled by the desire to get rid of these errors. It was assumed,
+that more low-level C++ implementation could shine the light on them. But it was found out, that even after successfully obtaining first results with pure C++ inference,
+these errors kept their alternating appearence at the \code{main()} program's exit. During the debugging process it was established,
+that these errors indeed come from \code{libedgetpu} library, presumably during cleanup routine after the inference is completed. There was, however,
+no possibility to trace the exact line of code causing these errors, since provided \code{libedgetpu} library was build without debugging information.
+In order to trace these errors the library would have to be rebuild with the necessary debugging information included. This potentially encompasses difficuilties
+with broken dependencies and other corresponding to the custom low-level library installation difficuilties.
+This is certainly a very interesting and worthwhile investigative error, but it lies beyond the scope of this thesis.
+It is assumed, that the error was fixed in later \code{libedgetpu} releases\footnote{\url{https://github.com/tensorflow/tensorflow/issues/62371}},
+but with no official way to update the library on the given device the dive into custom build would have been inevitable.
+
+It was decided to continue the work, since these error had no effects on performance and results.
+It is possible to run multiple \code{Interpreter} invokations to process folders of files.
+It is, however, not possible to run any code after fully completed inference, since the program is crashing at exit.
+Therefore stitching and conversion processes had to be done as separate programs.
+
 \section{Evaluation}
 \label{sec:evaluation}
 
