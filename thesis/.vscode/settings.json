@@ -10,6 +10,9 @@
     {
       "name": "latexmk",
       "command": "latexmk",
+      "env": {
+        "TEXMF_OUTPUT_DIRECTORY": "C:\\Users\\andre\\Documents\\BA\\thesis\\build"
+      },
       "args": [
         "-synctex=1",
         "-interaction=errorstopmode",

@@ -645,11 +645,11 @@ No more information provided.
 
 \todo{improve description}
 
-The final result is the \gls{edgetpu}-inference ready \code{.tflite} file.
+The final result is the \gls{edgetpu}-inference ready \code{.tflite} model file.
 
 \subsection*{Technical Challenges}
 
-The \gls{devboard} is running on a legacy version of Mendel Linux v...  <check and paste link>, which is the only one latest officialy supported software version for \gls{devboard}.
+The \gls{devboard} is running on a end of life version of Mendel Linux v...  <check and paste link>, which is the only one latest officialy supported software version for \gls{devboard}.
 With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0 released on <verify version and maybe find date>, exposing a low-level C++ \gls{api}
 for direct interaction with \gls{edgetpu}. Consequently, this library version is the latest officially available in Coral repository for this Mendel Linux release.
 Building the newest one as of today from source requires more complex process using Bazel and potentially breaking dependencies and necessitates debugging,
@@ -871,10 +871,177 @@ This setup was subsequently used later on during the full process of the pipelin
 \section{Deployment}
 \label{sec:deployment}
 
+After training, conversion and compilation processes the \code{.tflite} model is deployed on \gls{edgetpu} to run inference.
 
+At early development stage the most convenient deployment way with the help of python utilities was applied.
+Provided by Google these libraries wrap all necessary boilerplate into a small amount of functions with a purpose to conveniently load the model into \gls{edgetpu},
+pass the input tensor to it and collect the output tensor. A simplified example of full inference in python code is presented below for understanding the simplicity of
+operating \gls{edgetpu} with provided heplers.
+
+%\begin{minted}{python}
+%from pycoral.utils.edgetpu import make_interpreter
+%from pycoral.adapters import common
+%
+%# Load model
+%interpreter = make_interpreter(model_path)
+%interpreter.allocate_tensors()
+%
+%# Prepare input
+%common.set_input(interpreter, input_tensor)
+%
+%# Inference
+%interpreter.invoke()
+%
+%# Output
+%output = common.output_tensor(interpreter, 0)
+%\end{minted}
+
+\todo{ENABLE Minted}
+
+Utilizing the provided python modules the first inference results were obtained, they are presented along with the corresponding ground truth on the image below.
+
+\begin{figure}[htbp]
+    \centering
+    % First image
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[height=5cm]{files/FIRSTInferenceResult.png}
+        \caption{First image}
+    \end{subfigure}
+    \hfill
+    % Second image
+    \begin{subfigure}{0.45\textwidth}
+        \centering
+        \includegraphics[height=5cm]{files/FIRSTInferenceResultGT.png}
+        \caption{Second image}
+    \end{subfigure}
+    \caption{Two images side by side}
+    \label{fig:two-images}
+\end{figure}
+
+This single patch inference initial results became a milestone of this work and laid the foundation for the subsequent inference pipeline.
+
+To simplify the operation of \gls{edgetpu} hardware so much, developers are providing two python libraries\footnote{\url{https://coral.ai/docs/edgetpu/tflite-python/}}:
+PyCoral \gls{api} and \gls{tflite} \gls{api}, where PyCoral wraps the \gls{tflite} repetitive functions needed for inference into even simplier ones, as shown on the image above <REF>.
+
+After successfull implementation of a single patch inference in python, it was decided to expand it into the full scene inference pipeline using C++.
+The main rationale behind it lies in the extended control over inference process and its potential acceleration.
+Furthermore python overhead functions to, for instance, read the \code{.TIF} images directly,
+transform them and pass to \gls{edgetpu} in one go yields on one side teh convenience of implementing the complete pipeline inside one script.
+On the other side, however, may lead to slowed process unwanted on embedded system inference. This logic applies to other necessary operations,
+that potentially had to be performed in python. More common approach for embedded systems has to be utilized, transforming the input data
+potentionally on other device, perform inference on edge device, transform output data on other device.
+Additionall factor that led to implementation of C++ inference was the specific error,
+encountered at the end of each and every Python inference. It was believed at the time,
+that more control over inference sequence with the help of C++ functions will shed light on and help to get rid of that error.
+More specific about it in \secshortref{subsec:tecchallDeployment}.
+
+The \gls{devboard} Mendel Linux OS contains from installation almost every library needed for operating its \gls{edgetpu} module.
+That holds true for Python libraries, such as PyCoral and \gls{tflite} \glspl{api}, as well as for hardware runtime library \code{libedgetpu}.
+The essential \gls{tflite} C++ \gls{api} library is not included, though.
+It is furthermore impossible to cross use the \gls{tflite} \gls{api} for Python by C++,
+since the binary is compiled specifically for Python and in fact lacks the header files for C++.
+On a chart below the general flow of running the model on \gls{edgetpu} on \gls{devboard} is represented,
+highlighting the difference between inference implementation in Python and C++.
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  >=Stealth, ->,
+  box/.style={rectangle,draw,rounded corners,
+              minimum width=1cm,minimum height=1cm,
+              align=center,font=\normalsize}
+]
+
+% Shared start
+\node[box] (model) {.tflite\\FlatBuffer Model};
+
+% API branches
+\node[box, right=0.5cm of model, yshift=2cm] (pyapi) {PyCoral \gls{api} (optional) or\\\gls{tflite} Python \gls{api}};
+\node[box, right=0.5cm of model, yshift=-2cm] (cppapi) {\gls{tflite} C++ \gls{api}\\(headers \& library)};
+
+% Convergence
+\node[box, right=4cm of model] (interp) {\gls{tflite} Interpreter\\(C++ core)};
+
+% Runtime + hardware
+\node[box, right=1cm of interp] (runtime) {\gls{edgetpu} runtime driver\\\texttt{libedgetpu.so}};
+\node[box, right=1cm of runtime] (hw) {\gls{edgetpu}\\Hardware Accelerator};
+
+% Connections
+\draw (model) -- (pyapi);
+\draw (model) -- (cppapi);
+\draw (pyapi) -- (interp);
+\draw (cppapi) -- (interp);
+\draw (interp) -- (runtime) -- (hw);
+
+\end{tikzpicture}%
+}
+\caption{ADJUST}
+\end{figure}
+
+Since no pre-build \gls{tflite} C++ \gls{api} libraries can be found for \gls{devboard}, it had to be build from source.
+The process is described in detail in \secshortref{subsec:tecchallDeployment}
+and marks the third and the last technical implementation challenge milestone in the scope of this work.
+
+After successfully incorporating the \gls{tflite} C++ \gls{api} library on \gls{devboard},
+it was utilized to implement the first C++ inference inside the \code{inference.cpp} file. Following the success,
+the folder reading feature was implemented on C++ to process multiple patches in a row.
+These patches had to be stored as \code{.bin} files with known shape and type (\gls{float32}) of the data inside.
+After inference the program writes output \code{.bin} files with predicted cloud masks in \gls{float32} format.
+Quantization parameters of input and output are retrieved from model during the inference and used for quantized transformation of input and dequantization of the output tensor.
+Later on, the stitching process was C++ implemented too.
+By running the \code{stitch.cpp} file all \code{.bin} patches inside the input folder are gapless stitched into a single \code{.bim} scene.
+This \code{.bin} scene can be then converted to \code{.png} file for visual inspection.
+It is implemented to optionally be performed on \gls{devboard} with the help of Python script \code{convert.py}.
+\todo{check all filenames}
+It has to be mentioned, that for the sake of convenience the whole inference, stitching and conversion process could have been implemented as a single C++ executable.
+It was kept, however, separate due to two reasons. Firstly allowing more fexibility and less overhead for later potentially performance critical implementation on the satellite.
+Secondly, the persisting error, described in \secshortref{subsec:tecchallDeployment}, is not allowing to run any code immediately after inference process is done.
+
+As final steps, concluding the inference implementation on \gls{devboard} were following improvements.
+The SDCard with prepared \code{.bin} patches for each scene on it, is mounted on a \gls{devboard}. This allows to host the entire dataset of several GBs of size,
+which would be impossible to do an a \gls{devboard}.
+The stitching and conversion processes were unified under a single executable, with Pyhton function call for conversion after C++ \code{.bin} stitching.
+During both inference and stitch-conversion pracesses the user is promted to pick one out of 20 test scenes for inference and/or conversion.
+Furthermore, the Python process of conversion to \code{.png} is improved by eliminating the big output array being loaded in \gls{devboard}'s RAM memory,
+by handling it in chunks, therefore enabling to convert bigger full resolution scenes.
+
+The final version of inference, stitching and conversion implementation on a \gls{devboard} can be found in \code{git} under the tag \code{Deployment\_v1.0}.
+
+\subsection*{Technical Challenges}
+\label{subsec:tecchallDeployment}
+
+The last significant implementation milestone in the scope of this work was to build the \gls{tflite} C++ \gls{api} library for the \gls{devboard} from source.
+As can be seen on the chart <REF>, this library is crucial for implementation of pure C++ inference.
+
+A guidance to carry out this task is very sparsely mentioned in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/tflite-cpp/\#build-your-project-with-libedgetpu}}.
+Taking these recommendations into account it was clear, that the compatible version of \gls{tf} to a pre-installed on \gls{devboard} \code{libedgetpu} library had to be determined.
+The version of installed \code{libedgetpu} was determined quickly as v16.0. But on the official releases website\footnote{\url{https://github.com/google-coral/libedgetpu/releases}},
+can be found no mention of numerical verison convention, so the literal date when the symlink \code{libedgetpu.so.1} was modified was used to approximately determine the release version.
+On the particular \gls{devboard} used in this work it was the 09.07.2021,
+predating the official "Grouper" \code{libedgetpu} release\footnote{\url{https://github.com/google-coral/libedgetpu/tree/release-grouper}} on 26.07.2021 by two weeks.
+Hence from the \code{workspace.bzl} of this exact release the exact \gls{tf} commit corresponding to the \gls{tf} release 2.5.0 as of 05.17.2021 was determined.
+
+First build try was performed on a Windows machine, cross-compiling for \code{aarch64} Linux. After successfull compilation the wall was hit during the first inference test,
+where it was run into low level incompatibility with \gls{devboard}'s atomic instructions. It became clear, that the library has to be build either by using Bazel with predefinition
+of full \gls{devboard} configuration or directly on the \gls{devboard}. It was made a decision to stick with the second option. In order to do it, the SDCard was used to host large
+\gls{tf} folder (of the specific v2.5.0 commit) and additionally provide RAM swap space, due to concerns,
+that \gls{devboard} will run out of RAM memory during compilation process. It is important to mention,
+that building was performed using the latest by the time of the work portable version of \code{CMake}. 
+
+After successfully building the static \code{libtensorflow-lite.a} library, several additional necessary steps had to be performed and files gathered.
+The unavoidable \code{edgetpu.h} header has to be downloaded\footnote{\url{https://github.com/google-coral/libedgetpu/blob/master/tflite/public/edgetpu.h}},
+together with a compatible with the given build FlatBuffers library v1.12.0. Additionally every \gls{tflite} required static library had to be included.
+The necessary include files are provided in git and can also be investigated in \code{MAKEFILE}.
+
+After all compilator and linker issues were resolved and requirements satisfied, the successfull model loading and tensor allocation using C++ \gls{api}
+marked the last technical milestone of this work.
 
 \section{Evaluation}
 \label{sec:evaluation}
+
+
 
 \todo{Smooth transition to evaluation chapter! Very nice!}
 
