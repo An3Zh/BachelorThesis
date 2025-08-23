@@ -1021,7 +1021,7 @@ The version of installed \code{libedgetpu} was determined quickly as v16.0. But 
 can be found no mention of numerical verison convention, so the literal date when the symlink \code{libedgetpu.so.1} was modified was used to approximately determine the release version.
 On the particular \gls{devboard} used in this work it was the 09.07.2021,
 predating the official "Grouper" \code{libedgetpu} release\footnote{\url{https://github.com/google-coral/libedgetpu/tree/release-grouper}} on 26.07.2021 by two weeks.
-Hence from the \code{workspace.bzl} of this exact release the exact \gls{tf} commit corresponding to the \gls{tf} release 2.5.0 as of 05.17.2021 was determined.
+Hence from the \code{workspace.bzl} of this exact release the exact \gls{tf} commit corresponding to the \gls{tf} release 2.5.0 as of 05.07.2021 was determined.
 
 First build try was performed on a Windows machine, cross-compiling for \code{aarch64} Linux. After successfull compilation the wall was hit during the first inference test,
 where it was run into low level incompatibility with \gls{devboard}'s atomic instructions. It became clear, that the library has to be build either by using Bazel with predefinition
