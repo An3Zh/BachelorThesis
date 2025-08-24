@@ -36,7 +36,7 @@ Below the detailed description of both architectures is presented:
     connected sequentionally. An output layer is represented by a \code{Conv2D} layer.
     Base number of filter is specified as 32 and is doubled/halved in each encoder/decoder block respectively, resulting in 256 filters in the bottleneck.
     \gls{bn} is applied accordingly after each \code{Conv2D} layer, but before its activation function. \gls{bn} is not applied in output layer.
-    All suitable \glspl{tfop} are \gls{qat} annotaded. \gls{bce} is used as loss function and \code{adam} is used as optimizer.
+    All suitable \glspl{tfop} are \gls{qat} annotaded. \gls{bce} is used as loss function and \code{adam} \cite{adam} is used as optimizer.
     \item \textbf{improvedCloudEdgeQ}: This model mimics the previous architecture with the following improvements.
     Between input and first encoder block a \code{Conv2D} layer with 16 filters is added to improve feature representation at the input stage,
     enabling the encoder to capture more consistent low-level patterns before deeper processing.

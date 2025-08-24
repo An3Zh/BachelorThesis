@@ -6,23 +6,50 @@
 \chapter{Introduction}
 \section{Motivation}
 
-Electronic components in satellites and spacecraft are exposed to intense radiation, high-energy particles, and extreme temperature fluctuations. To ensure reliability under these harsh conditions, manufacturers traditionally rely on certified space-grade components. However, design, production, and certification of such components are costly and time\--con\-su\-ming. 
+Electronic components in satellites and spacecraft are exposed to intense radiation, high-energy particles, and extreme temperature fluctuations.
+To ensure reliability under these harsh conditions, manufacturers traditionally rely on certified space-grade components.
+However, design, production, and certification of such components are costly and time\--con\-su\-ming. 
 
-The AITHER project aims to investigate whether COTS (Commercial Off-The-Shelf) components can be effectively used in nano- and microsatellites (10-100 kg). Specifically, the project explores the feasibility of using COTS-based onboard architecture to perform reliable and computationally demanding tasks --- such as matrix operations in deep-learning based cloud segmenation --- directly in space. 
+The AITHER project aims to investigate whether \gls{cots} components can be effectively used in nano- and microsatellites (10-100 kg).
+Specifically, the project explores the feasibility of using \gls{cots}-based onboard architecture to perform reliable and computationally demanding tasks,
+such as matrix operations in deep-learning based cloud segmenation, directly in space. 
 
-As part of this initiative, the 10kg nanosatellite OOV-CUBE was launched into orbit on July 9th 2024. Among its hosted payloads is the Coral Dev Board Mini – a single-board computer developed by Google with an embedded Edge TPU designed for fast, low-power machine learning inference in constrained environments.
+As part of this initiative, the 10kg nanosatellite OOV-CUBE was launched into orbit on July 9th 2024.
+Among its hosted payloads is the \gls{devboard} --- a single-board computer developed by Google with an embedded \gls{edgetpu} designed for fast,
+low-power machine learning inference in constrained environments.
 
-Alongside radiation shielding and thermal management strategies, a technology demonstrator is being developed to assess the tolerance of these components to space radiation (e.g. protons, gamma rays). A central objective of the project is to determine not only how broadly COTS components can be applied in space systems, but also whether complex image processing tasks can be carried out onboard. This would reduce the need for data downlink and significantly improve the efficiency of Earth observation and communication missions.
+Alongside radiation shielding and thermal management strategies,
+a technology demonstrator is being developed to assess the tolerance of these components to space radiation.
+A central objective of the project is to determine not only how broadly \gls{cots} components can be applied in space systems,
+but also whether complex image processing tasks can be carried out onboard.
+This would reduce the need for data downlink and significantly improve the efficiency of Earth observation and communication missions.
 
+\clearpage
 \section{Objective}
 
-While the satellite's structure was designed with radiation shielding and thermal management in mind, the software for onboard inference still needs to be developed and uplinked into the orbit. This thesis focuses on the implementation of a convolutional neural network (CNN) for cloud segmentation from satellite imagery. Although efficient CNN architectures already exist and have been described in recent scientific literature, porting such a model to an embedded platform introduces unique challenges. These include limitations in memory, computation power of both central processing unit (CPU) and tensor processing unit (TPU) as well as model format compatibility.
+While the satellite's structure was designed with radiation shielding and thermal management in mind,
+the software for onboard inference still needs to be developed and uplinked into the orbit.
+This thesis focuses on the implementation of \gls{cnn} for cloud segmentation from satellite imagery.
+Although efficient \gls{cnn} architectures already exist and have been described in recent scientific literature,
+porting such a model to an embedded platform introduces unique challenges. These include limitations in memory,
+computation power of both \gls{cpu} and \gls{tpu} as well as model format compatibility.
 
-The goal of this thesis is to design, train and deploy a CNN model for cloud segmentation on the Coral Dev Board Mini. The core task is to adapt the model for efficient inference on the Edge TPU, overcoming hardware constraints while maintaining acceptable segmentation performance. This work serves as a demonstration of the potential to carry out deep learning inference onboard a satellite using COTS hardware.
+The goal of this thesis is to design, train and deploy a \gls{cnn} model for cloud segmentation on the \gls{devboard}.
+The core task is to adapt the model for efficient inference on the \gls{edgetpu},
+overcoming hardware constraints while maintaining acceptable segmentation performance.
+This work serves as a demonstration of the potential to carry out deep learning inference onboard a satellite using \gls{cots} hardware.
 
-\section{Document structure}
+\section{Scope and Delimitations}
 
-This thesis is structured as follows: in Chapter 2, preliminary knowledge on essential topics is introduced, along with the concept developed to achieve the goals of this thesis. Chapter 3 provides a detailed description of the implementation of these conceptual ideas. In Chapter 4, a quantitative evaluation of the obtained results is presented. Chapter 5 concludes the thesis by summarizing the key findings and providing an outlook on future work. A secondary goal of this thesis is to thoroughly document the entire process --- from initial concept to a fully functional solution –-- in a clear and practical manner, enabling efficient replication and learning from our experience.
+This work focuses on overcoming the implementation challenges of a deep learning algorithm on an embedded system.
+The \code{Cloud-Net} \cite{CloudNet2019} architecture for binary cloud segmentation in satellite images will be modified
+for deployment on the \glsxtrlong{edgetpu} located on the \glsxtrlong{devboard}.
+The pipeline foundation will be laid to enable the transfer of other AI algorithms to the \gls{edgetpu} format in the future.
+Predictions of a \gls{cnn}, adapted for embedded inference on the \gls{edgetpu}, will be evaluated.
 
+Model training will be limited to the 38-Cloud dataset referenced in \cite{CloudNet2019}.
+The \gls{rgb} and \gls{nir} channels of the input satellite imagery may be used.
+Extensive hyperparameter tuning to achieve extraordinary performance in cloud segmentation will not be undertaken.
+Software engineering requirements specific to satellite development are not considered.
 
 }

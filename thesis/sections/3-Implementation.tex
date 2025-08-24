@@ -211,8 +211,8 @@ Upon completion of training, the final model weights are saved and immediately u
 
 \subsection*{Technical Challenges}
 
-Training of initial proof-of-concept models was performed on a personal workstation equipped with an Intel Core i5-13400F CPU and an NVIDIA GeForce RTX 4060 GPU.
-To enable GPU acceleration for the \gls{tf} training process, the NVIDIA \gls{cuda} \gls{api} and the corresponding \gls{cudnn} library must be installed and configured.
+Training of initial proof-of-concept models was performed on a personal workstation equipped with an Intel Core i5-13400F \gls{cpu} and an NVIDIA GeForce RTX 4060 \gls{gpu}.
+To enable \gls{gpu} acceleration for the \gls{tf} training process, the NVIDIA \gls{cuda} \gls{api} and the corresponding \gls{cudnn} library must be installed and configured.
 The following versions were used: \gls{cuda} v11.2 and \gls{cudnn} v8.1.1.
 These versions are not the latest available from NVIDIA at the time of this work, but were selected for compatibility with certain \glspl{tfop} and the \code{libedgetpu} runtime library.
 Further details on these compatibility considerations are discussed in \secshortref{sec:conversion} and \secshortref{sec:deployment}.
@@ -226,16 +226,16 @@ With the introduction of more complex models containing 2,000,000 and 30,000,000
 For these larger models, one epoch on the full training dataset required approximately 3 minutes and 12 minutes, respectively.
 Since at least 100 epochs were necessary to achieve adequate model performance, more powerful hardware resources became essential.
 
-Thunder Compute, an American startup providing GPU cloud resources for machine learning and data science, was utilized for large-scale experiments \cite{thundercompute}.
-By using an instance with an NVIDIA A100XL GPU, training times for the 2,000,000 parameter network were reduced to approximately 20 seconds per epoch,
+Thunder Compute, an American startup providing \gls{gpu} cloud resources for machine learning and data science, was utilized for large-scale experiments \cite{thundercompute}.
+By using an instance with an NVIDIA A100XL \gls{gpu}, training times for the 2,000,000 parameter network were reduced to approximately 20 seconds per epoch,
 and for the 30,000,000 parameter network to 40 seconds per epoch.
-A \ensuremath{10\times} increase in GPU memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes,
+A \ensuremath{10\times} increase in \gls{gpu} memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes,
 resulting in more effective training and improved model robustness.
 
 However, significant effort was required to configure the cloud instance for compatibility.
 The more expensive production mode had to be used, as the prototyping mode did not allow downgrading \gls{cuda} and \gls{cudnn} versions \cite{thundercomputeProtProd}.
 The \gls{cuda} and \gls{cudnn} libraries needed to be downgraded from their most recent platform versions to those compatible with an older \gls{tf} version.
-This was challenging, as it required purging the latest \gls{cuda} and \gls{cudnn} files without removing the GPU drivers required by the older versions.
+This was challenging, as it required purging the latest \gls{cuda} and \gls{cudnn} files without removing the \gls{gpu} drivers required by the older versions.
 Ultimately, \gls{cuda} v... and \gls{cudnn} v... were installed on the instance for subsequent training.
 In addition, the Thunder Compute development team was contacted with a suggestion to allow selection of \gls{cuda} and \gls{cudnn} versions at instance creation.
 As a result, an improvement is planned that will allow passing the desired \gls{cuda} and \gls{cudnn} version as an environment variable during instance startup.
@@ -321,7 +321,7 @@ In the tables below, quantization-relevant information is displayed for further 
   \end{center}
 \end{layerbox}
 
-\begin{layerbox}{Layer Type: \glsxtrlong{bn}}{Layer Name: \glsentryshort{batchnorm} No. 1}
+\begin{layerbox}{Layer Type: \glsxtrlong{bn}}{Layer Name: \gls{bn} No. 1}
   \begin{center}
     \textbf{Shape of $\gamma$, $\beta$, $\mu_{\text{moving}}$, $\sigma^2_{\text{moving}}$ parameters:} \\[2pt]
     $[32]$ \\[6pt]
@@ -540,7 +540,7 @@ After the quantized model is saved, the \gls{edgetpu} Compiler is invoked.
 
 \subsection*{Edge TPU Compiling}
 
-Since training may be performed either on a local Windows machine or on a Linux-based cloud GPU instance from Thunder Compute,
+Since training may be performed either on a local Windows machine or on a Linux-based cloud \gls{gpu} instance from Thunder Compute,
 cross-platform automation of the pipeline is ensured by using helper functions and platform detection before invoking the \gls{edgetpu} compiler.
 Because the \gls{edgetpu} compiler can only run on Debian-based Linux systems, the Windows Subsystem for Linux (WSL) is used when working on a Windows machine.
 
@@ -804,7 +804,7 @@ QUANTIZE             1             Mapped to Edge TPU
 
 This behaviour confirms the inability of multiple model's layers to meet the requirements defined in \secshortref{subsec:hardware},
 as well as confirms the procedure of compilation process in official documentation\footnote{\url{https://coral.ai/docs/edgetpu/models-intro/\#compiling}}.
-That states that the compiler will stop at a first unsopported by \gls{edgetpu} operation and delegate all subsequent operations for CPU execution,
+That states that the compiler will stop at a first unsopported by \gls{edgetpu} operation and delegate all subsequent operations for \gls{cpu} execution,
 even if after unsopported \gls{tfop} come the supported for \gls{edgetpu} execution operations. This behaviour is represented on the image below.
 
 \begin{figure}[htbp]
@@ -824,7 +824,7 @@ even if after unsopported \gls{tfop} come the supported for \gls{edgetpu} execut
   \label{fig:compileSeqEdgeTPU}
 \end{figure}
 
-The delegation of tensor operations to CPU will almost certainly drastically increase the inference time,
+The delegation of tensor operations to \gls{cpu} will almost certainly drastically increase the inference time,
 which is inappropriate in the scope of the work, aspiring to map the entire model on \gls{edgetpu}.
 
 As the process of \code{Transpose} \gls{tfop} insertion is happening completely internally and automatically,
@@ -1084,11 +1084,11 @@ The evaluation pipeline consists of two parts: inference and evaluation.
 The necessary functions to perform inference and to save the results are implemented in \code{inference.py} and \code{inferenceQ.py} files.
 \code{inferenceQ.py} utilizes \gls{tflite} Interpreter and the corresponding fully \gls{int8} quantized \code{.tflite} model to perform inference,
 while \code{inference.py} operates with \gls{tf} utilities and uses \code{.h5} saved model format.
-It was noticed, that performing quantized model inference on a CPU results in significantly slower inference time compared to \code{.h5} \gls{float32} model.
+It was noticed, that performing quantized model inference on a \gls{cpu} results in significantly slower inference time compared to \code{.h5} \gls{float32} model.
 This slows down the evaluation process. It was furthermore noticed,
-that execution of quantized model on a general use CPU <specify CPU and mention that it was even slower!!!> yields similar inference time
+that execution of quantized model on a general use \gls{cpu} <specify CPU and mention that it was even slower!!!> yields similar inference time
 compared to deploying the quantized model on a dedicated \gls{edgetpu}. This inherently epmphasizes the sophistication of a \gls{tpu} to perform
-this type of operations compared to much more powerful for general tasks CPU. These findings resulted in omiting the quantized inference during the evaluation process.
+this type of operations compared to much more powerful for general tasks \gls{cpu}. These findings resulted in omiting the quantized inference during the evaluation process.
 \code{inference.py} is therefore used for the rest of the evaluation.
 
 Firstly, the \code{buildDS} function feature is used to construct the testing dataset.

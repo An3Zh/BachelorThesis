@@ -1,46 +1,150 @@
 {
 
-%\setlength{\parindent}{0pt}
+\setlength{\parindent}{0pt}
 \setlength{\parskip}{1em}
 
 \chapter{Preliminaries}
 
-\section{Context}
-\subsection{Satellite Imagery}
-OOV CUBE has only 3 channel camera, but the efficient cloud segmentation requires 4th NIR channel. \todo{expplain why}
-\subsection{State-of-the-Art}
+\section{Cloud Segmentation in Satellite Imagery}
+
+The first successful weather satellite, TIROS-1, was launched on April 1, 1960.
+During its mission it returned thousands of photographs showing cloud-cover views of the Earth,
+which proved extremely helpful for predicting large-scale weather changes and significantly improving forecasting capabilities.
+
+From this point, the need to distinguish cloud from non-cloud regions became clear, either to remove clouds for
+surface-focused analyses or to study the cloud field itself, both of which require separating clouds from the rest of the image.
+In time-series for weather forecasting, the motion of cloud layers can be tracked and predicted by expert analysts.
+Automating this process is one precise example where cloud segmentation is essential.
+
+Early segmenation workflows relied on manual inspection and empirical thresholding.
+Over the years, these evolved into image processing methods, then classical machine learning,
+and today into deep learning models, most notably \glspl{cnn}, to achieve reliable, scalable cloud segmentation.
+
+Automated extraction of cloud masks can be challenging when analyzing only the visible light bands: \gls{rgb}.
+With additional sensors, satellites capture other wavelengths such as \glsxtrlong{nir}, Shortwave Infrared, and Thermal Infrared.
+Each of these channels can benefit cloud segmentation in its own way.
+Given the 38-Cloud dataset, which contains \gls{rgb} and \gls{nir} channel images from the Landsat 8 mission, this work will focus on them.
+\gls{nir} is especially helpful for distinguishing clouds over liquid water, where it is strongly absorbed.
+It also helps separate clouds from green vegetation, which is bright in the \gls{nir} band.
+
+However, the OOV-CUBE satellite hosts only an \gls{rgb} camera onboard.
+Cloud segmentation utilizing only these channels is possible, but may yield less accurate masks.
+Therefore, the necessity to provide and evaluate a model that uses only the visible channels will be considered in this work.
+
+\clearpage
+\section{Convolutional Neural Networks for Cloud Segmentation}
 \label{subsec:stateoftheart}
 
-CNNs are a class of neural networks that apply small, learnable filters --- known as convolutional kernels --- across an image to extract spatial features. A CNN typically consists of multiple convolutional layers stacked sequentionally. Each layer applies a set of filters that capture different visual patterns, such as edges or textures. As the network goes deeper, the spatial resolution of the image decreases, while the depth (i.e., number of channels) increases. This is a result of applying multiple filters and optionally using pooling layers, which downsample feature maps to reduce computational complexity and introduce spatial invariance.
-\todo{Explain briefly how they learn and optimize themselves, and what distinguishes them from just applying filters}
-In image segmentation tasks such as cloud detection, preserving spatial resolution is critical. Therefore, architectures often include an upsampling mechanism to reconstruct high-resolution output from compressed feature representations. This is achieved through transposed convolution (also known as deconvolution). While standard convolution reduces spatial resolution by aggregating local pixel values, transposed convolution performs the reverse: it distributes each value in the smaller feature map across a larger output, effectively increasing spatial dimensions and reversing the compression.
+\glspl{cnn} are a class of neural networks that apply small, learnable filters (convolutional kernels)
+across an image to extract spatial features. A \gls{cnn} typically consists of multiple convolutional layers stacked sequentially.
+Each layer applies a set of filters that capture different visual patterns, such as edges, textures, or simple shapes.
+As the network goes deeper, the spatial resolution of the image decreases, while the depth (number of channels) increases.
+This is a result of applying multiple filters and optionally using pooling layers,
+which downsample feature maps to reduce computational complexity and introduce spatial invariance.
 
-One of the most influential architectures for image segmenation is the U-Net. Originally introduced by Ronneberger et al.~\cite{ronneberger2015u} for biomedical image segmentation, U-Net has become a standard in many domains, including remote sensing and cloud detection. A U-Net consists of an encoder-decoder structure. The encoder compresses the input image spatially while increasing its feature dimensionality. The decoder then reconstructs the spatial dimensions, progressively reducing the number of channels. This results in output imgage, that has the same spatial dimensions height and width, but could have a various number of channels, depending on the perceived task. The U-Net architecture shown in the diagram 1 was used by Mohajerani et al.~\cite{mohajerani2019cloudnet}  for their cloud detection algorithm.
+In classical image processing, filter parameters can be hand-crafted to extract specific features. %(for example, Sobel or Laplacian operators).
+In deep learning, however, these parameters are learned from data.
+Given a sufficiently deep network of filters, gradient descent techniques are applied to a loss function
+that measures the discrepancy between the network's output and the known \gls{gt}.
+In this way, the network is optimized to extract the necessary information from images.
 
-\begin{figure}[H]
+In image segmentation tasks such as cloud detection, preserving spatial resolution is critical.
+Therefore, architectures often include an upsampling mechanism to reconstruct high-resolution output from compressed feature representations.
+This is achieved through transposed convolution (also known as deconvolution).
+While standard convolution reduces spatial resolution by aggregating local pixel values, transposed convolution performs the reverse:
+it distributes each value in the smaller feature map across a larger output, effectively increasing spatial dimensions and reversing the compression.
+
+One of the most influential architectures for image segmentation is the \code{U-Net}.
+Originally introduced by Ronneberger et al.~\cite{ronneberger2015u} for biomedical image segmentation,
+\code{U-Net} has become a standard in many domains, including remote sensing and cloud detection.
+This architecture has proven highly effective for segmentation tasks, even with limited training data.
+A \code{U-Net} consists of an encoder-decoder structure.
+The encoder compresses the input image spatially while increasing its feature dimensionality.
+The decoder then reconstructs the spatial dimensions, progressively reducing the number of channels.
+This yields an output image with the same spatial dimensions (height and width) as the input, but could have a various number of channels, depending on the perceived task.
+The \code{U-Net} architecture shown in \autoref{fig:unet-architecture} was used by Mohajerani et al.~\cite{CloudNet2019} for their cloud detection algorithm.
+
+\begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{files/U-Net_cloud_detection.png}
-  \caption{U-Net architecture adapted for cloud detection as used by Mohajerani et al.~\cite{mohajerani2019cloudnet}.}
+  \includegraphics[width=\textwidth]{files/U-Net_cloud_detection1.png}
+  \caption{U-Net architecture adapted for cloud detection by Mohajerani et al.~\cite{CloudNet2019}}
   \label{fig:unet-architecture}
 \end{figure}
 
 
-A key innovation in U-Net is the use of residual (skip) connections \cite{he2015deepresiduallearningimage}, which dierectly link feature maps from the encoder to corresponding layers in the decoder with the same spatial size. These connections preserve fine-grained spatial details and significantly enhance segmentation quality. Moreover, they mitigate the vanishing gradient problem, facilitating the training of deeper networks and improving convergence.
+A key innovation in \code{U-Net} is the use of residual (skip) connections \cite{he2015deepresiduallearningimage},
+which directly link feature maps from the encoder to corresponding layers in the decoder with the same spatial size.
+These connections preserve fine-grained spatial details and significantly enhance segmentation quality.
+Moreover, they mitigate the vanishing gradient problem, facilitating the training of deeper networks and improving convergence.
 
-\subsection{Dataset}
+\section{Evaluation Metrics of Convolutional Neural Networks}
+\label{subsec:evalmetrics}
+
+After performing a binary cloud segmentation task, a \gls{cnn} outputs a probability mask
+with continuous values in \([0,1]\).
+A threshold is then selected to binarize the probability mask:
+values at or above the threshold are set to one (cloud present), and values below the threshold are set to zero (no cloud present).
+
+
+The predicted cloud mask is then compared with the \gls{gt} mask.
+For each overlapping pixel, four outcomes are possible:
+\begin{itemize}
+    \item \textbf{True Positive (TP):} Pixel is cloud in the prediction and in the \gls{gt}.
+    \item \textbf{True Negative (TN):} Pixel is not cloud in the prediction and in the \gls{gt}.
+    \item \textbf{False Positive (FP):} Pixel is cloud in the prediction but not in the \gls{gt}.
+    \item \textbf{False Negative (FN):} Pixel is not cloud in the prediction but cloud in the \gls{gt}.
+\end{itemize}
+
+Using these outcomes, widely accepted metrics for evaluating \gls{cnn} performance on the cloud segmentation task are defined.
+The following metrics will be used in this work:
+
+\[
+\begin{array}{llcl}
+\text{Accuracy}  &= \dfrac{TP + TN}{TP + TN + FP + FN} 
+& \quad \text{Precision} &= \dfrac{TP}{TP + FP} \\[1.2em]
+\text{Recall}    &= \dfrac{TP}{TP + FN} 
+& \quad \text{Jaccard Index (IoU)} &= \dfrac{TP}{TP + FP + FN} \\[1.2em]
+\text{Dice Coefficient} &= \dfrac{2TP}{2TP + FP + FN} & &
+\end{array}
+\]
+
+Accuracy represents the fraction of correctly predicted pixels relative to the total number of pixels.
+Precision reflects how selective the model is: high precision means the model labels a pixel as cloud only when confident,
+which may increase false negatives (missed clouds).
+High recall, on the other hand, indicates the model tries to catch as many clouds as possible, which may increase false positives.
+The Jaccard Index (Intersection over Union) \cite{jaccardindex} and the Dice Coefficient \cite{dicecoefficient}
+both relate precision and recall and measure the overlap between the predicted and \gls{gt} sets.
+
+Note that the optimal threshold, the value that yields the closest match between the predicted binary mask and the \gls{gt}, is not necessarily \(0.5\).
+It can lie anywhere in \([0,1]\). A common approach is to evaluate the precision-recall curve and select the threshold according to a chosen criterion (for example, maximum F1-Score) \cite{prc, f1}.
+
+
+\section{38-Cloud dataset}
 \label{subsec:dataset}
 
-Landsat 8 is an Earth observation satellite launched on February 11, 2013, providing high-resolution multispectral imagery, including visible, \gls{nir}, and Thermal Infrared bands \cite{landsat8}. For cloud segmentation tasks, the \gls{rgb} and \gls{nir} channels are particularly valuable due to their ability to capture both visual and athmospheric information.
-
-\todo{in satellite imagery add spectral ranges, explain why theyre useful for cloud detection and link datasets channels from 2.1.3 to the table of spectral ranges later, atmospheric information , clarify this. Rewrite better}
-
-This thesis utilizes a dataset consisting of 38 annotated satellite images from the Landsat 8 mission, commonly referred to as the 38-Cloud:
-A Cloud Segmentation Dataset \cite{38cloud}.
-It has been introduced and adapted in the following scientific publications \cite{CloudNet2019}, \cite{CloudDet2018}.
+Landsat 8\footnote{\url{https://landsat.gsfc.nasa.gov/satellites/landsat-8/}} is an Earth observation satellite launched on February 11, 2013,
+providing high-resolution multispectral imagery, including \gls{rgb}, \gls{nir}, and Thermal Infrared bands.
+This thesis utilizes a dataset consisting of 38 annotated satellite images from the Landsat 8 mission,
+commonly referred to as the 38-Cloud dataset\footnote{\url{https://github.com/SorourMo/38-Cloud-A-Cloud-Segmentation-Dataset}}.
+It has been introduced and adapted in the following scientific publications \cite{CloudDet2018, CloudNet2019}.
 38 images are divided into a training set containing 18 scenes and a test set with the remaining 20 scenes.
-The folder structure of the dataset is illustrated below:
+The folder structure of the dataset is illustrated in \autoref{fig:dsFolderStruct}.
 
-\begin{figure}[H]
+Each image consists of four spectral channels: \gls{rgb} and \gls{nir}, along with a manually annotated \gls{gt} mask that labels cloud regions at the pixel level.
+The four spectral channels are encoded using \glspl{uint16} per pixel, whereas the \gls{gt} masks are represented with \glspl{uint8}.
+A single raw image at full resolution of approximately \ensuremath{8000\times8000} pixels would result in a file size of around 1GB.
+Moreover, processing such images would require model input tensors of shape \ensuremath{batchsize\times8000\times8000\times4} in \gls{float32} after normalization.
+Since efficient training typically necessitates a \ensuremath{batchsize} greater than one,
+this setup would impose substantial computational demands due to increased model size and would significantly slow down both training and inference ---
+making it particularly unsuitable for deployment on embedded systems.
+To address this, the dataset is provided in a pre-cropped format, with each image and its corresponding \gls{gt} mask divided into \ensuremath{384\times384} pixel patches.
+These patches are saved as \code{.TIF} files within their respective channel-specific directories, such as \code{train\_red}, \code{train\_green}, and so forth.
+The \gls{gt} patches for training are stored in the \code{train\_gt} directory.
+
+It is important to note, however, that pre-cropped \gls{gt} patches are not available for the test subset.
+Instead, complete scene \gls{gt} masks are provided in the \code{Entire\_scene\_gts} directories for both the train and test subsets.
+
+\begin{figure}[!h]
 \dirtree{%
 .1 38-Cloud Dataset.
 .2 38-Cloud\_training.
@@ -64,58 +168,43 @@ The folder structure of the dataset is illustrated below:
 .3 test\_sceneids\_38-Cloud.csv.
 .2 training\_patches\_38-cloud\_nonempty.csv.
 }
-\caption{Folder structure of the 38-Cloud Dataset}
+\caption{Folder structure of the 38-Cloud dataset.}
 \label{fig:dsFolderStruct}
 \end{figure}
 
-Each image consists of four spectral channels: \gls{rgb} and \gls{nir}, along with a manually annotated \gls{gt} mask that labels cloud regions at the pixel level.
-The four spectral channels are encoded using \glspl{uint16} per pixel, whereas the \gls{gt} masks are represented with \glspl{uint8}.
-A single raw image at full resolution of approximately \ensuremath{8000\times8000} pixels would result in a file size of around 1GB.
-Moreover, processing such images would require model input tensors of shape \ensuremath{batchsize\times8000\times8000\times4} in \gls{float32} after normalization.
-Since efficient training typically necessitates a \ensuremath{batchsize} greater than one,
-this setup would impose substantial computational demands due to increased model size and would significantly slow down both training and inference ---
-making it particularly unsuitable for deployment on embedded systems.
-To address this, the dataset is provided in a pre-cropped format, with each image and its corresponding \gls{gt} mask divided into 384x384 pixel patches.
-These patches are saved as \code{.TIF} files within their respective channel-specific directories, such as \code{train\_red}, \code{train\_green}, and so forth.
-The \gls{gt} patches for training are stored in the \code{train\_gt} directory.
+The examples of training patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location
+are shown in \autoref{fig:patch_example} as normalized greyscale images. 
 
-\todo{maybe describe it better, to distinguish between gt train and test}
-
-It is important to note, however, that pre-cropped \gls{gt} patches are not available for the test subset.
-Instead, complete scene \gls{gt} masks are provided in the \code{Entire\_scene\_gts} directories for both the train and test subsets.
-
-The examples of training patches from all four spectral channels and the corresponding \gls{gt} mask at a fixed location are shown below as normalized greyscale images: 
-
-\begin{figure}[H]
+\begin{figure}[!h]
   \centering
-  \begin{subfigure}[t]{0.22\textwidth}
+  \begin{subfigure}[t]{0.19\textwidth}
     \includegraphics[width=\linewidth]{files/examples/red_patch.png}
     \caption{Red}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[t]{0.22\textwidth}
+  \begin{subfigure}[t]{0.19\textwidth}
     \includegraphics[width=\linewidth]{files/examples/green_patch.png}
     \caption{Green}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[t]{0.22\textwidth}
+  \begin{subfigure}[t]{0.19\textwidth}
     \includegraphics[width=\linewidth]{files/examples/blue_patch.png}
     \caption{Blue}
   \end{subfigure}
   \hfill
-  \begin{subfigure}[t]{0.22\textwidth}
+  \begin{subfigure}[t]{0.19\textwidth}
     \includegraphics[width=\linewidth]{files/examples/nir_patch.png}
     \caption{NIR}
   \end{subfigure}
 
   \vspace{0.5em}
 
-  \begin{subfigure}[t]{0.22\textwidth}
+  \begin{subfigure}[t]{0.19\textwidth}
     \includegraphics[width=\linewidth]{files/examples/gt_patch.png}
-    \caption{Ground Truth}
+    \caption{\gls{gt}}
   \end{subfigure}
 
-  \caption{Four spectral input patches and the corresponding ground truth mask.}
+  \caption{Four spectral input patches and the corresponding \gls{gt} mask.}
   \label{fig:patch_example}
 \end{figure}
 
@@ -150,17 +239,14 @@ These zero-information patches were excluded from the training and validation se
 which could degrade the model's ability to learn meaningful patterns.
 The remaining useful patch names are stored in \code{training\_patches\_38-cloud\_nonempty.csv} file.
 
-Together, these \code{.csv} files serve as the basis for dataset construction, as discussed in \secshortref{sec:data}.
-Furthermore, the embedded attributes such as \code{index}, \code{row \& col} will be directly utilized during the stitching process described in \secshortref{subsec:testing}.
+Together, these \code{.csv} files serve as the basis for dataset construction in \secshortref{sec:data}.
+Furthermore, the attributes such as \code{index}, \code{row \& col} will be directly utilized during the stitching process described in \secshortref{subsec:testing}.
 
-For visualization purposes, the full scene images are rendered using a standard false-color composite in which the \gls{nir} band is mapped to red, red band to green, and green band to blue.
-This mapping coresponds to the commonly used \gls{cir} visualization in remote sensing \cite{cir1}.
-\todo{check patches and scenes to verify what bands were replaced}
-\gls{cir} imagery enhances features such as vegetation and clouds, which exhibit distinct reflectance patterns across the visible and \gls{nir} spectrum.
-However, these false-color visualizations were not used as input for the \gls{cnn} during training, validation, or inference.
+For visualization purposes, the full scene images are rendered using a false-color composite.
+However, these visualizations were not used as input for the \gls{cnn} during training, validation, or inference.
 They served solely as visual references for qualitative inspection by the human observer.
 The corresponding images are located in the \code{Natural\_False\_Color} directories.
-An example scene is shown below as a false-color composite: 
+An example scene is shown below in \autoref{fig:false_color_scene}: 
 
 \begin{figure}[H]
   \centering
@@ -169,10 +255,8 @@ An example scene is shown below as a false-color composite:
   \label{fig:false_color_scene}
 \end{figure}
 
-\subsection{Evaluation Metrics}
-\label{subsec:evalmetrics}
 
-\subsection{Quantization}
+\section{Quantization}
 \label{subsec:quantization}
 
 Quantization is a mathematical method that maps a large set of (typically continuous) values to a smaller, discrete and countable set.
@@ -180,9 +264,8 @@ Its first practical application can be traced back to 1957, in the context of pu
 The earliest formal scientific documentation of the method appears in a publication from 1982,
 which is based on a draft manuscript originally authored in 1957 \cite{firstQuantization}.
 
-This technique is now widely employed in machine learning \cite{MLQuantization1, MLQuantization2}.
-Quantization significantly reduces model size by compressing numerical precision, typically at the cost of a controlled reduction in accuracy.
-\todo{add paper or image by how much model size can be reduced}
+This technique is now widely employed in machine learning \cite{MLQuantization1, MLQuantization2, quantnnwhite}.
+Quantization significantly reduces model size \cite{quantcompression} by compressing numerical precision, typically at the cost of a controlled reduction in accuracy.
 Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case ---
 symmetric absolute maximum (absmax) quantization.
 In the context of this work, the general asymetric approach is of primary importance.
@@ -191,6 +274,7 @@ To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max
 and \( q_{\text{min}} \) and \( q_{\text{max}} \) of the target (quantized) value set must be defined.
 Once these are known, the corresponding scale and zero-point parameters are computed according to the following equations:
 
+\clearpage
 \begin{equation}
 \text{scale} = \frac{x_{\text{max}} - x_{\text{min}}}{q_{\text{max}} - q_{\text{min}}}
 \label{eq:scale}
@@ -220,42 +304,31 @@ For every value range subject to quantization, a unique pair of these parameters
 The following example demonstrates the use of zero-point quantization. Consider a set of continuous values ranging from -9.75 to 3.00.
 To map this range onto a discrete set defined by the integer interval [-128, 127], the scale and zero-point are calculated using equations \ref{eq:scale} and \ref{eq:zeropoint}:
 
-\begin{equation*}
-\text{scale} = \frac{3.00 - (-9.75)}{127 - (-128)} = 0.05
-\end{equation*}
-
-\begin{equation*}
-\text{zero-point} = \text{round}\left( -128 - \frac{-9.75}{\text{scale}} \right) = 67
-\end{equation*}
-
+\[
+\begin{array}{rlrl}
+\text{scale} &= \dfrac{3.00 - (-9.75)}{127 - (-128)} = 0.05
+& \quad
+\text{zero-point} &= \text{round}\!\left(-128 - \dfrac{-9.75}{\text{scale}}\right) = 67
+\end{array}
+\]
 
 After this step, every value from the original dataset can be represented by its corresponding quantized counterpart.
 The following equations illustrate the quantization and subsequent dequantization of four examples using \ref{eq:quantize} and \ref{eq:dequantize}:
 \( x = 0 \), \( x = 3.00 \), \( x = 2.98 \), \( x = 2.95 \):
 
-\begin{align*}
-q_{0} &= \text{round}\left(\frac{0}{0.05} \right) + 67 = 67
-& \quad
-x_{67} &\approx \left( 67 - 67 \right) \cdot 0.05 = 0
-\end{align*}
+\[
+\begin{array}{rlrl}
+q_{0}     &= \text{round}\!\left(\tfrac{0}{0.05} \right) + 67 = 67
+& x_{67}   &\approx (67 - 67)\cdot 0.05 = 0 \\[0.5ex]
+q_{3.00}  &= \text{round}\!\left(\tfrac{3.00}{0.05} \right) + 67 = 127
+& x_{127} &\approx (127 - 67)\cdot 0.05 = 3.00 \\[0.5ex]
+q_{2.98}  &= \text{round}\!\left(\tfrac{2.98}{0.05} \right) + 67 = 127
+& x_{127} &\approx (127 - 67)\cdot 0.05 = 3.00 \\[0.5ex]
+q_{2.95}  &= \text{round}\!\left(\tfrac{2.95}{0.05} \right) + 67 = 126
+& x_{126} &\approx (126 - 67)\cdot 0.05 = 2.95
+\end{array}
+\]
 
-\begin{align*}
-q_{3.00} &= \text{round}\left(\frac{3.00}{0.05} \right) + 67 = 127
-& \quad
-x_{127} &\approx \left( 127 - 67 \right) \cdot 0.05 = 3.00
-\end{align*}
-
-\begin{align*}
-q_{2.98} &= \text{round}\left(\frac{2.98}{0.05} \right) + 67 = 127
-& \quad
-x_{127} &\approx \left( 127 - 67 \right) \cdot 0.05 = 3.00
-\end{align*}
-
-\begin{align*}
-q_{2.95} &= \text{round}\left(\frac{2.95}{0.05} \right) + 67 = 126
-& \quad
-x_{126} &\approx \left( 126 - 67 \right) \cdot 0.05 = 2.95
-\end{align*}
 
 The last three examples implicitly demonstrate the loss of precision introduced by quantization.
 In this particular case, any input value between 2.95 and 3.00 will be represented, after conversion, by one of these two discrete values.
@@ -275,7 +348,7 @@ To mitigate this, the model architecture can be adapted to perform \gls{qat} pri
 \gls{qat} does require additional computational operations, resulting in increased training time.
 It should be clarified that model training can be performed using various numerical data types for model parameters; in this work, however, \gls{float32} is used.
 
-\subsubsection{Quantization-Aware Training}
+\section{Quantization-Aware Training}
 \label{subsubsec:qat}
 
 The model architecture is modified by inserting quantization-dequantization operations at the connections between layers,
@@ -292,7 +365,7 @@ At the end of \gls{qat}, the model parameters are adapted to the effects of quan
 
 \todo{Insert Netron screenshot showing scales, quantizedwrappersV2, and bias scales in the implementation/conversion section. Explain scale and bit shifts for integer arithmetic on Coral.}
 
-\subsubsection{Post-Training Quantization}
+\section{Post-Training Quantization}
 
 The actual conversion of model parameters is performed during \gls{ptq}.
 Regardless of whether \gls{qat} was performed, \gls{ptq} can always be applied to quantize a model.
@@ -314,7 +387,7 @@ The observed extrema are then used to set the quantization parameters for every 
 This trade-off maximally reduces model size and enables highly efficient inference using integer-only arithmetic.
 \end{itemize}
 
-\subsection{Hardware}
+\section{Hardware}
 \label{subsec:hardware}
 
 Running machine learning inference on embedded systems is referred to as edge inference.

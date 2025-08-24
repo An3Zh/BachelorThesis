@@ -29,6 +29,7 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{enumitem}
+\setlist[itemize]{noitemsep, topsep=0pt}
 \usepackage{setspace}
 \usepackage{subcaption}
 \usepackage{changepage}
@@ -70,6 +71,9 @@
   enhanced,
   sharp corners=southwest,
 }
+
+\usepackage{chngcntr}
+\counterwithout{figure}{chapter} % \counterwithin{figure}{section} for section. Delete if wanna keep default figure counter 
 
 %\usepackage{booktabs,multirow,array}
 
