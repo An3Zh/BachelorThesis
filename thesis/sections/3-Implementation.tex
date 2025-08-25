@@ -6,15 +6,22 @@
 \chapter{Implementation}
 \label{chapter:implementation}
 
-The previous chapter outlined the design and rationale for each system component. The following sections describe the practical realization, with a focus on engineering decisions, code-level implementation, and hardware-specific challenges.
+A detailed description of the software development process used to achieve the thesis objective is provided in this chapter.
+Along the way, three major implementation milestones were reached. Despite several hurdles, success was achieved in
+(i) training the model on powerful cloud machines, (ii) mapping its all components, fully quantized, to the \gls{edgetpu},
+and (iii) performing C++ inference on the \gls{devboard}.
+The technical obstacles and their resolution are presented in three “Technical Challenges” chapters inside
+\nameref{sec:training}, \nameref{sec:conversion}, and \nameref{sec:deployment}.
 
-\todo{MILESTONES and difficuilties}
+Software developed in the scope of this work
+is made available for free and unrestricted use on the author's GitHub and TU Berlin GitLab profiles:
+\begin{itemize}
+  \item \url{https://github.com/An3Zh/BachelorThesis}
+  \item GitLab link
+\end{itemize}
 
-3 milestones.
-1. Explain libedgtpu + tflite. How difficuilt it was to get the right TF version
-2. Seting up thunder compute instances, installing the right cuda
-3. C++ inference on coral board. Building the tflite library from source with the right TF version. 
-
+Details on relevant file locations, with references to this work's chapters,
+as well as further information on the repository structure, are provided in \code{README.md}.
 
 \section{Data}
 \label{sec:data}
@@ -25,7 +32,8 @@ In order to construct the training and validation pipeline, the function \code{B
 The function was later extended to optionally include the test dataset, which will be discussed in \secshortref{subsec:testing}.
 
 Efficient data handling and memory management are achieved through the use of built-in \gls{tf} utilities.
-In particular, the \code{tf.Data.TextLineDataset} function~\cite{tfTextLineDataset} is employed to sequentionally read the \code{.csv} files,
+In particular, the \code{tf.Data.TextLineDataset}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/data/TextLineDataset}} function
+is employed to sequentionally read the \code{.csv} files,
 which contain the patch filenames as outlined in \secshortref{subsec:dataset}.
 This provides the foundation for the dataset pipeline.
 
@@ -34,7 +42,7 @@ Only 5155 of them contain valid data and are thus retained for subsequent use.
 The dataset is shuffled and split into training and validation subsets, with the ratio configurable as needed.
 
 Using the \code{.map} method, each text line is first expanded into five full paths to the corresponding \gls{rgb}, \gls{nir} and \gls{gt} mask patches.
-Each filepath is then replaced by its image content, loaded as \code{tf.Tensor}~\cite{tfTensor}.
+Each filepath is then replaced by its image content, loaded as \code{tf.Tensor}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/Tensor}}.
 This transformation is handled by the helper function \code{loadDS}, which itself calls utility function \code{loadTIF}.
 At this stage, each dataset element is a tuple of \gls{tf} tensors representing the four-channel input image and its corresponding \gls{gt} mask.
 
@@ -52,16 +60,13 @@ thus preserving hard edges in the cloud segmentation mask and avoiding the intro
 Conversely, the \gls{rgb} and \gls{nir} inputs are resized with bilinear interpolation,
 which computes each new pixel value as a weighted average of the nearest $2\times2$ neighborhood. This results in smooth pixel transitions while maintaining important image details.
 Nearest-neighbor interpolation is among the eraliest digital image resizing techniques, dating back to the origins of digital image processing in the 1960s,
-whereas bilinear interpolation gained prominence in early computer graphics literature and is now standard in deep learning pipelines~\cite{bilinearNearest1, bilinearNearest2}.
+whereas bilinear interpolation gained prominence in early computer graphics literature and is now standard in deep learning pipelines \cite{bilinearNearest1, bilinearNearest2}.
 
 As a final preparation step, the dataset is: shuffled, batched, set to repeat indefinitely,
 and prefetched to optimize data retrieval during training.
 Because the datasets are repeated indefinitely, it is essential to define the number of steps required to complete one full pass through the training and validation subsets.
-These step counts are computed as follows: \ensuremath{trainSteps = trainSubsetSize / batchSize}, \ensuremath{valSteps = valSubsetSize / batchSize},
-and are used to ensure the correct number of iterations per epoch during training.
-
-\todo{adjust formula}
-\todo{maybe add code snippets}
+These step counts are used to ensure the correct number of iterations per epoch during training,
+and they are computed as follows: \code{trainSteps(valSteps)~=~trainSubsetSize(valSubsetSize)~/~batchSize}.
 
 \subsection{Testing}
 \label{subsec:testing}
@@ -70,6 +75,7 @@ An additional capability of the \code{buildDS} is the construction of the test d
 As outlined in \secshortref{subsec:dataset}, only cropped \gls{rgb} and \gls{nir} test patches, together with complete scene \gls{gt} masks, are available for testing.
 This arrangement necessitates two specific preparation steps prior to building the test pipeline:
 
+\clearpage
 \begin{enumerate}
     \item \textbf{Metadata collection:} To uniquely identify each scene, the \code{sceneID} is introduced, derived from the Landsat 8 metadata (path/row),
     and is unique within this test dataset. The total number of patches, as well as the number of rows and columns for each scene, is collected for every \code{sceneID}.
@@ -84,11 +90,8 @@ This arrangement necessitates two specific preparation steps prior to building t
     \item \textbf{Patch stitching:} The \code{stitchPatches} function was implemented in \code{load.py}.
     This function uses the \code{.csv} files and the \code{getSceneGridSizes} function to reconstruct entire scenes from the model's output patches for evaluation.
     The function can operate in two modes: it can either stitch together all scenes at once, saving all 20 full scenes,
-    or stitch only a single specified scene. The rationale behind this design choice will be explained in the following paragraph.
+    or stitch only a single specified scene. The single-scene mode is intended for debugging and verification, avoiding time-consuming processing of the full test subset.
 \end{enumerate}
-\todo{maybe move some content to design, especially with stitching etc. Why whole DS and only 1 scene. Add additionalCSVs in folder structure,
-mention it there and reference to that chapter or to design.}
-\todo{explain maybe in design why whole DS and why only 1 scene}
 
 Following these preparatory steps, the \code{buildDS} function was extended with additional functionality to construct the test subset.
 Using the optional boolean parameter \code{includeTestDS}, which indicates whether to include the test dataset, and the parameter \code{singleSceneID},
@@ -105,75 +108,48 @@ It is important to emphasize that the test set is not shuffled, as preserving th
 
 Consequently, the \code{buildDS} function returns the training and validation subsets, along with their respective step counts based on the \code{batchSize}.
 Optionally, it also returns test subset, which may contain either the entire test dataset or a single scene.
-After inference, the model's output patches can be passed to the \code{stitchPatches} function, which reconstruct and saves the final scene images for further evaluation.
+After inference, the model's output patches can be passed to the \code{stitchPatches} function, which reconstructs and saves the final scene images for further evaluation.
 
+\clearpage
 \section{Model}
 \label{sec:model}
 
 The core building blocks and utility functions for architecting the model are organized in \code{model.py}.
-\gls{cnn} layers are constructed using \gls{tf}'s built-in \glspl{api}, allowing for modular and reusable design.
+\gls{cnn} layers are constructed using \gls{tf}'s built-in \glspl{api}, allowing for a modular and reusable design.
 
-\begin{table}[H]
-\centering
-\begin{tabularx}{\textwidth}{l X l l}
-\textbf{Model Name} & \textbf{Description} & \textbf{Parameters} & \textbf{Input Size} \\
-\hline
-BaseNet      & Minimal CNN for proof-of-concept 2 conv layers, 1 dense & 300,000 & 192×192×4 \\
-MediumNet    & Deeper CNN; 4 conv, 2 dense, dropout, QAT-ready          & 2,000,000 & 192×192×4 \\
-LargeNet     & U-Net variant; skip connections, batch norm, QAT         & 30,000,000 & 192×192×4 \\
-\end{tabularx}
-\caption{Overview of Model Architectures Used in This Work}
-\label{tab:model-architectures}
-\end{table}
+In early development, the \code{simple} model architecture was implemented.
+It served as a proof of concept and was used for initial debugging of the training and conversion pipelines, as well as to obtain the first inference results on the \gls{devboard}.
+The model was not annotated for \gls{qat}.
 
-
-At early development stages, the model architecture \code{simple} was implemented.
-It served as proof-of-concept and was used for initial debugging of training and conversion pipeline as well as to get the first inference results on \gls{devboard}.
-The model was not annotaded for \gls{qat}.
-
-Below are examples of layers of two models, the left one is not annotaded for \gls{qat}, the right one is annotaded for \gls{qat}.
-It is visualized using Netron\footnote{\url{https://netron.app/}}.
-As outlined in \secshortref{subsubsec:qat}, the \code{QuantizeWrapperV2} and \code{QuantizeLayer} \glspl{tfop} are inserted in the architecture,
-wrapping the base layers with quantization-dequantization operations.
-
-\todo{explain why quantized layer after input. Explain why youre putting this example here, why its important to step from regular model to qat annotated model}
+Below in \autoref{fig:quantnotquantcomp} are schown the examples of layer diagrams for two models: the left is not annotated for \gls{qat}, the right is annotated.
+These visualizations were produced with Netron\footnote{\url{https://netron.app/}}.
+Following the concept outlined in \secshortref{subsubsec:qat}, the \code{QuantizeWrapperV2} and \code{QuantizeLayer} \glspl{tfop} are inserted into the architecture,
+wrapping the base layers with quantize-dequantize operations.
 
 \begin{figure}[H]
   \centering
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
     \includegraphics[height=12cm]{files/modelPart.pdf}
-    \caption{Links}
+    \caption{model part not annotated for \protect\gls{qat}}
   \end{subfigure}
   \hfill
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
     \includegraphics[height=12cm]{files/modelPartQ.pdf}
-    \caption{Rechts}
+    \caption{model part annotated for \protect\gls{qat}}
   \end{subfigure}
-  \caption{Zwei SVGs nebeneinander (als PDF)}
+  \caption{Model before and after \protect\gls{qat} annotation}
+  \label{fig:quantnotquantcomp}
 \end{figure}
 
-By taking a closer look it has to be mentioned, that in \gls{qat} model the \code{QuantizeLayer} is insertded in order to quantize input tensors.
-The function Conv2D is wrapped into quantizedWrapper ...\todo{explain all basics, to be continued in Conversion}
-It is important to emphasize, that the \gls{bn} \gls{tfop} is inserted after \code{Conv2D} and before \code{Activation} \glspl{tfop} \cite{batchnormActivation}.
+It is important to emphasize that \gls{bn} is applied to the output of the \code{Conv2D} \gls{tfop} and precedes the corresponding \code{Activation} function \cite{batchnormActivation}.
 
-Later on, a more complex, already \code{uNet} architecture was implemented, already involving more, deeper layers and implementing skip connections.
-Early versions of this model architecture were not \gls{qat} annotaded, only \gls{ptq} was used at conversion time.
-Below 
+Subsequently, more complex \code{U-Net} architectures were implemented, with greater depth and skip connections.
+Early versions of these models were not \gls{qat} annotated, instead, \gls{ptq} was applied at conversion time.
 
-\code{uNet} model already represents the deep \code{uNet} architecture with \dots, model layers, however, are not annotaded for \gls{qat}.
-
-\todo{explain different architecture functions here, maybe even all of them. Mention \gls{qat} annotation} 
-
-Additionally, where standard \gls{tf} loss functions are insufficient, custom loss functions such as \code{softJaccardLoss} or \code{diceLoss} are implemented in model architectures.
-Custom metrics, particularly relevant for evaluation of segmentation tasks are also implemented within this module.
-These metrics include\dots
-\todo{describe metrics}
-
-\todo{mention binary crossentropy compared to softJaccardLoss! Maybe this in evaluation.}
-
-Below, are shown the examples of the parts of uNet \gls{cnn}
+Where standard \gls{tf} loss functions are insufficient, custom losses such as \code{softJaccardLoss} and \code{diceLoss} are implemented in this module.
+Custom metrics, particularly those used for segmentation evaluation and referenced in \autoref{subsec:evalmetrics}, are also provided within the \code{model.py} file.
 
 \section{Training}
 \label{sec:training}
@@ -220,23 +196,24 @@ Further details on these compatibility considerations are discussed in \secshort
 Initial models containing approximately 300,000 parameters were trained without \gls{qat} for tens of epochs.
 On the described setup and using the full training dataset, the time required for a single epoch was less than 15 seconds, which was deemed acceptable.
 
-\todo{double check parameters number}
-
-With the introduction of more complex models containing 2,000,000 and 30,000,000 parameters, and when employing \gls{qat}, training times increased significantly.
+With the introduction of more complex models containing 2,000,000 and 30,000,000 (experimental, proven to be inefficient at edge inference) parameters,
+and when employing \gls{qat}, training times increased significantly.
 For these larger models, one epoch on the full training dataset required approximately 3 minutes and 12 minutes, respectively.
 Since at least 100 epochs were necessary to achieve adequate model performance, more powerful hardware resources became essential.
 
-Thunder Compute, an American startup providing \gls{gpu} cloud resources for machine learning and data science, was utilized for large-scale experiments \cite{thundercompute}.
+Thunder Compute\footnote{\url{https://www.thundercompute.com/}}, an American startup with \gls{gpu} cloud resources for machine learning and data science,
+provided solutions for large-scale experiments.
 By using an instance with an NVIDIA A100XL \gls{gpu}, training times for the 2,000,000 parameter network were reduced to approximately 20 seconds per epoch,
 and for the 30,000,000 parameter network to 40 seconds per epoch.
 A \ensuremath{10\times} increase in \gls{gpu} memory, to 80GB on the A100XL compared to 8GB on the RTX 4060, also enabled larger batch sizes,
 resulting in more effective training and improved model robustness.
 
 However, significant effort was required to configure the cloud instance for compatibility.
-The more expensive production mode had to be used, as the prototyping mode did not allow downgrading \gls{cuda} and \gls{cudnn} versions \cite{thundercomputeProtProd}.
+The more expensive production mode\footnote{\url{https://www.thundercompute.com/docs/production-mode}} had to be used,
+as the prototyping mode\footnote{\url{https://www.thundercompute.com/docs/prototyping-mode}} did not allow downgrading \gls{cuda} and \gls{cudnn} versions.
 The \gls{cuda} and \gls{cudnn} libraries needed to be downgraded from their most recent platform versions to those compatible with an older \gls{tf} version.
 This was challenging, as it required purging the latest \gls{cuda} and \gls{cudnn} files without removing the \gls{gpu} drivers required by the older versions.
-Ultimately, \gls{cuda} v... and \gls{cudnn} v... were installed on the instance for subsequent training.
+Ultimately, \gls{cuda} v11.2 and \gls{cudnn} v8.1.0 were installed on the instance for subsequent training.
 In addition, the Thunder Compute development team was contacted with a suggestion to allow selection of \gls{cuda} and \gls{cudnn} versions at instance creation.
 As a result, an improvement is planned that will allow passing the desired \gls{cuda} and \gls{cudnn} version as an environment variable during instance startup.
 
@@ -246,7 +223,7 @@ As a result, an improvement is planned that will allow passing the desired \gls{
 The file \code{convert.py} contains all necessary functions and utilities for model conversion and \gls{edgetpu} compilation.
 These functions are called from \code{main.py} immediately after training is complete.
 
-\subsection*{Weight Transfer}
+\subsection{Weight Transfer}
 
 As outlined in \secshortref{subsec:hardware}, the \gls{edgetpu} supports input tensors with at most three dimensions.
 This necessitates the use of batch size one, since the input tensor shape is already \ensuremath{image~height~\times~image~width~\times~number~of~channels}.
@@ -254,48 +231,60 @@ During training, larger batch sizes are typically used for efficiency.
 Therefore, after training, the function \code{asBatchOne} is used to transfer the trained weights to a model with identical architecture,
 but with batch size set to one for the input, all intermediate computations, and the output.
 
-\subsection*{Post-Training Quantization}
+\subsection{Post-Training Quantization}
 
-The \code{tf.lite.TFLiteConverter}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/lite/TFLiteConverter}} utility is used to perform \gls{ptq} and convert the model to
+The \code{tf.lite.TFLiteConverter}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/lite/TFLiteConverter}} utility is used to perform \gls{ptq} and convert the model into
 the \code{.tflite} format.
-A representative dataset is generated using the \code{representativeDatasetGen} function, consisting of training \gls{rgb} and \gls{nir} patches.
+A representative dataset, consisting of training \gls{rgb} and \gls{nir} patches, is generated using the \code{representativeDatasetGen} function.
 The number of calibration batches used can be adjusted via \code{numCalBatches}, as defined in \secshortref{sec:training}.
 The greater the amount of calibration data, the more likely the observed value range will closely match the inference data, improving quantization accuracy.
 
-Next, all supported \glspl{tfop}, as well as model inputs and outputs, are quantized.
-While various data types can be used for quantization in general, this work uses only \gls{int8} or \gls{uint8}, as required for \gls{edgetpu} compatibility (see \secshortref{subsec:hardware}).
+As a next step, all supported \glspl{tfop} as well as model inputs and outputs are quantized.
+While various data types can be used for quantization in general case,
+this work utilizes \gls{int8}, as required for \gls{edgetpu} compatibility in \secshortref{subsec:hardware}.
 
-The following subchapter provides a deeper investigation into quantization of model parameters by analyzing a \gls{qat}-annotated \gls{float32} model and its quantized version, using the Netron tool\footnote{\url{https://netron.app/}}.
-This chapter is aimed at readers who wish to deepen their understanding of parameter quantization and gain insight into the general techniques behind full-integer operation execution on edge devices such as the \gls{edgetpu}.
+The following subchapter provides a deeper investigation into quantization of model parameters by analyzing a \gls{qat}-annotated \gls{float32} model and its already quantized version.
+The Netron tool is used here as well for visualizing the model's parts.
+This chapter is aimed at readers who wish to deepen their understanding of parameter quantization and gain insight into the general techniques
+behind full-integer operation execution on edge devices such as the \gls{edgetpu}.
 
-It should be noted that both \gls{qat} annotation and \gls{ptq} are already wrapped into convenient, ready-to-use \gls{tflite} commands. Thus, this section is not intended to teach the implementation of quantized models from scratch. Instead, it aims to offer a deeper understanding that can be beneficial for debugging, designing custom (potentially more powerful) models, or simply appreciating the engineering trade-offs between speed, memory, and accuracy on constrained devices.
+It should be noted that both \gls{qat} annotation and \gls{ptq} are already wrapped into convenient, ready-to-use \gls{tflite} commands.
+Thus, this section is not intended to teach the implementation of quantized models from scratch. Instead, it aims to offer a deeper understanding that can be beneficial for debugging, designing custom (potentially more powerful) models, or simply appreciating the engineering trade-offs between speed, memory, and accuracy on constrained devices.
 
-\subsubsection*{Practical example of Model quantization}
+\subsection{Practical example of Model quantization}
 \label{subsubsec:optquant}
 
-Below, part of the architecture of a \code{.tflite} model after \gls{ptq} (right) is shown, alongside the same \gls{qat}-annotated model (left) before conversion.
+Below, a \gls{qat} annotated part of the model is shown in the left panel of \autoref{fig:qatconvertedquant}.
+On the right, the same part is shown after \gls{ptq}, yielding a fully \gls{int8} quantized model.
 
 \begin{figure}[H]
   \centering
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
     \includegraphics[height=12cm]{files/modelPartQBeforePTQ.pdf}
-    \caption{Links}
+    \caption{model part annotated for \protect\gls{qat}}
   \end{subfigure}
   \hfill
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
     \includegraphics[height=12cm]{files/modelPartQAfterPTQ.pdf}
-    \caption{Rechts}
+    \caption{model part after full \protect\gls{int8} quantization}
   \end{subfigure}
-  \caption{Zwei SVGs nebeneinander (als PDF)}
+  \caption{Model before and after quantization}
+  \label{fig:qatconvertedquant}
 \end{figure}
 
-Netron also provides detailed information about graph nodes (model layers) and their connections (tensor passes). For example, layer weights and biases can be directly inspected, and values can be examined.
-In the tables below, quantization-relevant information is displayed for further analysis. For both the \gls{qat} annotated model and the resulting quantized model, the relevant information for four layers is collected.
+Netron also provides detailed information about graph nodes (model layers) and their connections (tensor passes).
+For example, layer weights and biases can be directly inspected, and values can be examined.
+In the tables below, quantization-relevant information is displayed for further analysis.
 
-% Example usage
-\subsubsection*{\gls{qat} Model (left)}
+For both the \gls{qat} annotated model and the resulting quantized model, the relevant information for four layers is summarized.
+All floating-point numbers are shown in full \gls{float32} precision.
+Representative calculations are performed in full precision and displayed with extended decimals.
+The goal is to illustrate, using a practical example, the error effects of quantization and the limits of \gls{float32} precision.
+
+\clearpage
+\subsubsection*{\gls{qat} Annotated Model (left in \autoref{fig:qatconvertedquant})}
 
 \begin{layerbox}{Layer Type: QuantizeLayer}{Layer Name: Quantize Input}
   \begin{center}
@@ -344,8 +333,8 @@ In the tables below, quantization-relevant information is displayed for further 
   \end{center}
 \end{layerbox}
 
-\bigskip
-\subsubsection*{\gls{ptq} Model (right)}
+\clearpage
+\subsubsection*{Model after quantization (right in \autoref{fig:qatconvertedquant})}
 
 \begin{layerbox}{Layer Type: Conv2D}{Layer Name: Conv2D No. 1}
   \begin{center}
@@ -384,14 +373,16 @@ In the tables below, quantization-relevant information is displayed for further 
   \end{center}
 \end{layerbox}
 
-\begin{layerbox}{Layer Type: Relu}{Layer Name: Activation No. 1}
+\begin{layerbox}{Layer Type: ReLU}{Layer Name: Activation No. 1}
   \begin{center}
     \textbf{Output affine dequantization formula:} \\[2pt]
     $x_{\text{q}} \approx 0.07379141449928284 \times (q_{\text{x}} + 128)$ \\[6pt]
   \end{center}
 \end{layerbox}
 
-Before diving into the calculations, let's examine the Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}}. Below is the excerpt relevant to the \gls{tfop} \code{Conv2D}:
+\clearpage
+Before presenting the calculations, the Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}} is reviewed.
+An excerpt relevant to the \gls{tfop} \code{Conv2D} is shown below:
 
 \begin{verbatim}
 CONV_2D
@@ -415,58 +406,90 @@ CONV_2D
     granularity: per-tensor
 \end{verbatim}
 
-Using this information, we can retrace quantization calculations for a better understanding of model transformation. We start with the \code{input\_1} values — the model's input tensors — as observed in the \code{QuantizeLayer}. As expected, these range from 0 to 1 due to normalized input patches.
+Using this information, quantization calculations can be retraced for a better understanding of model transformation.
+The \code{input\_1} values, or the model's input tensors, are observed first from the \code{QuantizeLayer}.
+As expected, these range from 0 to 1 due to normalized input patches.
 
 The input scale and zero-point can be calculated using equations \ref{eq:scale} and \ref{eq:zeropoint} from \secshortref{subsec:quantization}:
 
-\begin{equation*}
-\text{scale} = \frac{1 - 0}{127 - (-128)} = 0.003921568627450980
-\end{equation*}
+\[
+\begin{array}{rl}
+\text{Input scale} &= \dfrac{1 - 0}{127 - (-128)} = 0.003921568627450980 \\[16pt]
+\text{Input zero-point} &= \text{round}\!\left(-128 - \dfrac{0}{\text{Input scale}}\right) = -128
+\end{array}
+\]
 
-\begin{equation*}
-\text{zero-point} = \text{round}\left( -128 - \frac{0}{\text{scale}} \right) = -128
-\end{equation*}
+The calculated values align with the "Input affine dequantization formula" for the \code{Conv2D} layer in the quantized model.
+The precision difference at the 10th decimal place is expected due to \gls{float32} limits.
+This confirms the use of affine (asymmetric) quantization for \code{Input 0},
+consistent with the table's range [-128,127] and the absence of a zero-point restriction.
 
-The calculated values align with the Input affine dequantization formula for the Conv2D layer in the \gls{ptq} model. The minor precision difference at the 10th decimal place is expected due to \gls{float32} limits. This confirms the use of affine (asymmetric) quantization for \code{Input 0}, consistent with the table's range [-128,127][-128,127] and the absence of a zero-point restriction.
+Moving to the \code{Conv2D} layer weights, the table specifies per-axis granularity with symmetric quantization (zero-point=0).
+Inspection of the 32 kernel value ranges (only Kernel No. 1 shown here) confirms symmetry around zero.
+This suggests that \gls{tf} enforces clipping of weight extremes to fit symmetric ranges.
 
-Moving to the Conv2D layer weights, the table specifies per-axis granularity with symmetric quantization (zero-point=0zero-point=0). Inspection of the 32 kernel value ranges (only Kernel No. 1 shown here) confirms symmetry around zero. This suggests that TensorFlow enforces clipping of weight extremes to fit symmetric ranges.
-
-Netron reveals that Kernel No. 1 has the largest max value among the 32 kernels, yet it still doesn't match the actual tensor maximum (-0.4123-0.4123 to 0.544260.54426), indicating that TensorFlow may apply additional optimization — likely outlier-aware clipping or mean adjustment — since real values are not perfectly zero-mean but the quantization requires zero-point =0=0. A detailed investigation of this effect lies outside the scope of this work.
+Netron reveals that Kernel No. 1 has the largest max value among the 32 kernels (not represented here),
+yet it still doesn't match the actual tensor extrema ($min=-0.4122757017612457, max=0.5442604422569275$),
+indicating that \gls{tf} may apply additional optimization, likely outlier-aware clipping or mean adjustment,
+since real values are not perfectly zero-mean ($mean=-0.005126346834471305$).
+A detailed investigation of this effect lies outside the scope of this work.
 
 Using the clipped extrema, the symmetric quantization scale is:
 
-\begin{equation*}
-\text{scale} = \frac{0.544256329536438 - (-0.544256329536438)}{127 - (-127)} = 0.004285482909735732
-\end{equation*}
+\[
+\begin{array}{rl}
+\text{Kernel No. 1 scale} &= \dfrac{0.544256329536438 - (-0.544256329536438)}{127 - (-127)}\\[8pt]
+                          &= 0.004285482909735732
+\end{array}
+\]
 
-This matches the Kernel No. 1 symmetric dequantization formula from the \gls{ptq} model table (within float precision limits).
-Applying equation \ref{eq:dequantize}, the first quantized element of Kernel No. 1 can be approximately dequantized to:
+This matches the Kernel No. 1 symmetric dequantization formula from the quantized model (within \gls{float32} precision limits).
+Applying equation \ref{eq:dequantize}, the quantized value can be approximately dequantized back to the first element of Kernel No. 1:
 
-\begin{equation*}
-x_{q} \approx 0.004285482689738274 \cdot 8 = 0.034283861517906192
-\end{equation*}
+\[
+\begin{array}{rl}
+\text{First element of Kernel No. 1} \approx 0.004285482689738274 \cdot 8 = 0.034283861517906192
+\end{array}
+\]
 
 The resulting precision loss is small and can be quantified by absolute, relative, and \gls{lsb} errors:
 
-\begin{itemize}
-    \item $e_{\text{abs}} = 0.03428386151790619 - 0.032761260867118835 \approx 0.0015226006507873535$
-    \item $e_{\text{rel}} = \frac{0.0015226006507873535}{0.032761260867118835} \times 100\% \approx 4.645\%$
-    \item $e_{\text{lsb}} = \frac{0.0015226006507873535}{0.004285482689738274} \approx 0.355,\ \Delta = 0.004285482689738274$
+\begin{itemize}[itemsep=0.4\baselineskip]
+    \item $e_{\text{abs}} = 0.034283861517906192 - 0.032761260867118835 = 0.001522600650787357$
+    \item $e_{\text{rel}} = \frac{0.001522600650787357}{0.032761260867118835} \times 100\% \approx 4.647\%$
+    \item $e_{\text{lsb}} = \frac{0.001522600650787357}{0.004285482689738274} \approx 0.355,\ \Delta = 0.004285482689738274$
 \end{itemize}
 
-Here, the \gls{lsb} error <0.5 is a good indicator: it suggests that scale boundaries are not exceeded and quantization was applied without mismatches, clipping errors, or encoding/decoding inconsistencies.
+Here, the \gls{lsb} error $<0.5$ is a good indicator: it suggests that scale boundaries are not exceeded and quantization was applied without mismatches,
+clipping errors, or encoding/decoding inconsistencies.
 
-Bias quantization in Conv2D layers is particularly interesting: the specification shows no independent bias scale. Instead, the bias scale is derived from the product of the input scale and the corresponding per-channel weight scale. This avoids costly rescaling operations during inference, allowing bias addition to be performed directly in fixed-point arithmetic — an elegant speed-accuracy trade-off.
+Looking at the bias restrictions in the Quantization Specification Table, an interesting point emerges:
+the bias has no dedicated quantization scale derived from its own extrema.
+Hence, no min/max values are logged by \code{QuantizeWrapperV2} for the \code{Conv2D} layer.
+Instead, its scale is computed as the product of the layer's input scale and the per-channel weight scale,
+yielding one bias scale per output channel (matching the weight scales per axis).
+This engineering choice accelerates inference at the cost of a slight precision loss.
 
-\begin{equation*}
-\text{scale} = 0.003921568859368563 \cdot 0.004285482689738274 = 0.000016805815463440644535387373480262
-\end{equation*}
+Multiplying input values by weights (each with its own scale) produces a new effective scale.
+To add the bias to this product, the bias must be quantized using the same scale (with zero-point=0).
+One could quantize the bias with its own scale and then rescale the product accordingly,
+but this introduces extra operations that would significantly slow inference.
+Instead, fast fixed-point arithmetic is employed, using a precomputed quantized multiplier and a bit-shift,
+to reconcile the mixed scales that arise when multiplying quantized values.
 
-\begin{equation*}
-x_{q} \approx 0.000016805815903353505 \cdot 11801 = 0.198325433475474712505
-\end{equation*}
+\[
+\begin{array}{rl}
+\text{Bias No. 1 scale} &= 0.003921568859368563 \cdot 0.004285482689738274 \\
+             &= 0.0000168058154634406445 \\[8pt]
+\text{Bias No. 1 value} &\approx 0.000016805815903353505 \cdot 11801 \\
+      &= 0.198325433475474713
+\end{array}
+\]
 
-The \gls{bn} \gls{tfop} is split into two simpler operations (Mul and Add) after quantization. This reflects the mathematical structure of batch normalization:
+Analogous calculations can be performed for the Bias No. 1 to determine its scale and recover its approximate \gls{float32} value.
+
+As can be seen in the Netron analysis, the \gls{bn} \gls{tfop} is decomposed into two primitive \glspl{tfop} after quantization: \code{Mul} and \code{Add}.
+This follows from the affine form of batch normalization (and its folding during quantization), which can be expressed as:
 
 \begin{equation}
 y = \gamma \cdot \frac{x - \mu_{\text{moving}}}{\sqrt{\sigma^2_{\text{moving}} + \epsilon}} + \beta
@@ -482,75 +505,78 @@ A_c = \beta_c - \frac{\gamma_c \cdot \mu_{\text{moving},c}}{\sqrt{\sigma^2_{\tex
 \end{equation}
 
 \begin{itemize}
-    \item $x$ — input value to be normalized.
-    \item $y$ — output value after batch normalization.
-    \item $\mu_{\text{moving},c}$ — moving mean for channel $c$, computed during training as an exponential moving average of per-batch means; used in inference because batch statistics from a single sample are often unreliable.
-    \item $\sigma^2_{\text{moving},c}$ — moving variance for channel $c$, computed during training as an exponential moving average of per-batch variances; also used in inference for the same reason as the moving mean.
-    \item $\epsilon$ — small constant to avoid division by zero.
-    \item $\gamma_c$ — learnable scale parameter for channel $c$.
-    \item $\beta_c$ — learnable shift parameter for channel $c$.
-    \item $M_c$ — per-channel multiplier used in quantized inference.
-    \item $A_c$ — per-channel additive term used in quantized inference.
+    \item \textbf{$x$}: input value to be normalized.
+    \item \textbf{$y$}: output value after batch normalization.
+    \item \textbf{$\mu_{\text{moving},c}$}: moving mean for channel $c$, computed during training as an exponential moving average of per-batch means; used in inference because batch statistics from a single sample are often unreliable.
+    \item \textbf{$\sigma^2_{\text{moving},c}$}: moving variance for channel $c$, computed during training as an exponential moving average of per-batch variances; also used in inference for the same reason as the moving mean.
+    \item \textbf{$\epsilon$}: small constant to avoid division by zero (default\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/keras/layers/BatchNormalization}} \gls{tf} value is set to 0.001).
+    \item \textbf{$\gamma_c$}: learnable scale parameter for channel $c$.
+    \item \textbf{$\beta_c$}: learnable shift parameter for channel $c$.
+    \item \textbf{$M_c$}: per-channel multiplier used in quantized inference.
+    \item \textbf{$A_c$}: per-channel additive term used in quantized inference.
 \end{itemize}
 
-In quantized form, $\mu_{\text{moving}}$, $\sigma^2_{\text{moving}}$, $\gamma$, and $\beta$ are fused into per-channel multiplier $M_c$ and additive term $A_c$. Reverse-engineering from the quantized values recovers the original parameters with minimal error:
+It should be noted that the affine dequantization of the \code{Mul} input is computed from the extrema of the outputs of \code{Conv2D} No.~1,
+analogous to the previous calculations of scales and zero-points.
+
+In quantized form, $\mu_{\text{moving}}$, $\sigma^2_{\text{moving}}$, $\gamma$, and $\beta$ are fused into per-channel multiplier $M_c$ and additive term $A_c$.
+Reverse-engineering from the quantized values recovers the original \gls{float32} parameters with minimal error:
 
 \begin{equation*}
 \begin{gathered}
-M_1 = 0.10698594152927399 \cdot (55 + 128) \approx 19.5784 \\
+M_1 = 0.10698594152927399 \cdot (55 + 128) \approx 19.5784273 \\
 \sqrt{\sigma^2_{\text{moving},1} + \epsilon} = \sqrt{0.00221889466047287 + 0.001} \approx 0.0567353 \\
-\hat{\gamma}_1 = M_1 \cdot \sqrt{\sigma^2_{\text{moving},1} + \epsilon} \approx 19.5784 \times 0.0567353 \approx 1.1107881 \\
-\hat{\gamma}_1 = 1.1107881 \approx \gamma_1 = 1.110548973083496
+\hat{\gamma}_1 = M_1 \cdot \sqrt{\sigma^2_{\text{moving},1} + \epsilon} \approx 19.5784273 \times 0.0567353 \approx 1.1107880 \\
+\hat{\gamma}_1 = 1.1107880 \approx \gamma_1 = 1.110548973083496
 \end{gathered}
 \end{equation*}
 
 
 \begin{equation*}
 \begin{gathered}
-A_1 = 0.0339626707136631 \cdot (-113 + 10) \approx -3.4941551 \\
-\beta_1 = A_1 + M_1 \cdot \mu_{\text{moving},1} \approx -3.4941551 + 19.5784 \times 0.1726332 \approx -0.1159326 \\
-\beta_1 = -0.1159326 \approx \beta_{1,\text{float}} = -0.11593257635831833
+A_1 = 0.0339626707136631 \cdot (-113 + 10) \approx -3.4981550 \\
+\beta_1 = A_1 + M_1 \cdot \mu_{\text{moving},1} \approx -3.4981550 + 19.5784273 \times 0.1726332 \approx -0.1182682 \\
+\beta_1 = -0.1182682 \approx \beta_{1,\text{float}} = -0.11593257635831833
 \end{gathered}
 \end{equation*}
 
-Finally, the Output affine dequantization formula is derived from the extrema of the Activation No. 1 layer:
+Finally, the "Output affine dequantization formula" is derived from the extrema of the (ReLU) Activation No. 1 layer:
 
-\begin{equation*}
-\text{scale} = \frac{18.816810607910156 - (-3.696099329375535 \mathrm{e}{-11})}{127 - (-128)} = 0.07379141414881222
-\end{equation*}
+\[
+\begin{array}{rl}
+\text{Output scale} &= \frac{18.816810607910156 - (-3.696099329375535 \mathrm{e}{-11})}{127 - (-128)} \\
+             &= 0.073791414148812224 \\[8pt]
+\text{Output zero-point} &= \text{round}\left( -128 - \frac{-3.696099329375535 \mathrm{e}{-11}}{\text{Output scale}} \right) \\
+                  &= -128
+\end{array}
+\]
 
-\begin{equation*}
-\text{zero-point} = \text{round}\left( -128 - \frac{-3.696099329375535 \mathrm{e}{-11}}{\text{scale}} \right) = -128
-\end{equation*}
 
 All subsequent quantization steps for \glspl{tfop} in the model follow the same general procedure, adhering to predefined constraints and reusing common underlying methods.
 
-By analyzing the results, the following key quantization principles emerge:
+From this deeper investigation, the following key quantization principles emerge:
 \begin{itemize}
-    \item After \gls{ptq}, the \code{Quantize Input} layer defines the input scale and zero-point based on observed extrema.
+    \item After \gls{ptq}, the \code{QuantizeInput} layer defines the input scale and input zero-point based on observed extrema.
+    Same calculation principles apply further.
     \item Weights are typically quantized per-axis (per-channel) with symmetric ranges.
     \item Bias scales are derived from input and weight scales, enabling fixed-point computation without extra rescaling.
-    \item Certain operations, such as BatchNorm, are decomposed into simpler arithmetic ops for inference efficiency.
-    \item The precision loss is usually small, and \gls{lsb} error below $0.5$ indicates a well-matched scale.
+    \item Certain operations, such as \gls{bn}, are decomposed into simpler arithmetic operations for inference efficiency.
+    \item The precision loss is small, and \gls{lsb} error below $0.5$ indicates well-matched scales.
 \end{itemize}
 
-In the \gls{qat} annotated model (left), the \texttt{QuantizeLayer} performs ``fake'' quantization --- quantizing and then immediately dequantizing tensors --- to simulate quantization effects during training.
+After quantized model is saved, the \gls{edgetpu} Compiler is invoked.
 
-After the quantized model is saved, the \gls{edgetpu} Compiler is invoked.
-
-\subsection*{Edge TPU Compiling}
+\clearpage
+\subsection{Edge TPU Compiling}
 
 Since training may be performed either on a local Windows machine or on a Linux-based cloud \gls{gpu} instance from Thunder Compute,
 cross-platform automation of the pipeline is ensured by using helper functions and platform detection before invoking the \gls{edgetpu} compiler.
 Because the \gls{edgetpu} compiler can only run on Debian-based Linux systems, the Windows Subsystem for Linux (WSL) is used when working on a Windows machine.
 
-\todo{explain in hardware: edgetpu runtime, and maybe moev compiler from design to hardware...}
+The \gls{edgetpu} Compiler parses the \code{.tflite} model, verifies that the restrictions are satisfied and that it is compatible with the \gls{edgetpu} runtime,
+and then attempts to fuse all supported \glspl{tfop} into a single \code{edgetpu-custom-op}.
+An example of the compiler's console output during compilation is shown below.
 
-The \gls{edgetpu} Compiler reads the saved \code{.tflite} model, checks restriction fulfillment and compatibility with \gls{edgetpu} runtime,
-before attempting to fuse all \glspl{tfop} into a single \code{edgetpu-custom-op}.
-Below an example of console log is illustrated, which \gls{edgetpu} Compiler outputs during the process of compilation.
-
-% Define a new style for Edge TPU compiler logs
 \lstdefinestyle{compilerlog}{
   basicstyle=\normalsize\ttfamily, % can adjust \fontsize{12pt}{13.5pt}
   captionpos=b,                    % caption at the bottom
@@ -560,9 +586,8 @@ Below an example of console log is illustrated, which \gls{edgetpu} Compiler out
   columns=fullflexible
 }
 
-% Use the style for this specific log
 \begin{lstlisting}[style=compilerlog,
-    caption={Edge TPU compiler output for the quantized model},
+    caption={Edge TPU compiler console output. Successful compilation},
     label={lst:edgetpu_compilation}]
 Edge TPU Compiler version 16.0.384591198
 Started a compilation timeout timer of 180 seconds.
@@ -584,38 +609,37 @@ Compilation child process completed within timeout period.
 Compilation succeeded!
 \end{lstlisting}
 
-\todo{check lstlisting in preliminaries and anywhere else and adjust global settings, so I dont need to use custom compilerlog setting here locally}
+The \gls{edgetpu} has \(\sim 8\,\mathrm{MiB}\) of static \gls{ram}, allowing model parameters to be cached.
+It is further specified\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#parameter-data-caching}} that multiple models can be co-compiled and
+stored in the \gls{edgetpu}'s on-chip memory, enabling fast switching and inference when different models are required on a single \gls{edgetpu}.
+Conversely, a model can be partitioned for pipelining across multiple \glspl{edgetpu}, allowing parallel inference or acceleration of larger models.
+In the scope of this thesis, however, only a single \gls{edgetpu} is used.
+Therefore, the on-chip static \gls{ram} should ideally not be exceeded to preserve inference speed.
+Falling back to external memory can degrade performance due to parameter reloads.
 
-The \gls{edgetpu} has $\sim8$ MiB of \gls{sram}, allowing it to cache model's parameter data. %\textasciitilde8~ 
-It is furthermore specified\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#parameter-data-caching}},
-that multiple models can be co-compiled and stored inside \gls{edgetpu} memory. This allows fast switching and inference, if it is required to use different models on one \gls{edgetpu}.
-It is moreover the vice versa methodology possible --- segmenting a model for pipelining on multiple \glspl{edgetpu}. This could allow parallel inference or acceleration of larger models.
-In the scope of this thesis, however, only one \gls{edgetpu} used for implementation work. Therefore ideally, but not necessary, the \gls{edgetpu} \gls{sram} has to be not overfilled,
-enabling faster inference. The use of external memory can negatively affect speed performance, requiring to reload model's parameters.
+From this log example, useful information about memory usage can be inferred.
+The model executable occupies approximately \(8 - 1.90 - 3.82 \approx 2.28\,\mathrm{MiB}\) of the \gls{edgetpu} on-chip cache.
+Its parameters occupy \(1.90\,\mathrm{MiB}\), leaving \(3.82\,\mathrm{MiB}\) free, thus, the entire model is stored in the \gls{edgetpu}'s static \gls{ram}.
+In \secshortref{chapter:evaluation}, memory usage is also considered when comparing different models.
+For this particular model, however, \(46.00\,\mathrm{KiB}\) of external memory was still utilized despite the remaining free on-chip memory.
+The reason is not documented officially and likely requires deeper investigation of the compilation process, which lies outside the scope of this thesis.
 
-From this concrete log example important information about memory usage can be backtraced. The model's executable is taking up approximately 8 - 1.90 - 3.82 = 2.28 MiB of \gls{edgetpu} cache.
-While its parameters take 1.90 MiB of cache, leaving 3.82 MiB free, therefore storing an entire model successfully into \gls{edgetpu} \gls{sram}.
-In !!!Evaluation!!! by comparing different models their memory usage will be considered too.
-For this particular model, the 46.00 KiB of external memory was, however, still utilized, despite the availabiklity of remaining free \gls{edgetpu} \gls{sram} memory.
-The reasons behind it could not be found in official documentation, potentionally requiring deeper investigation into compile process, which lies outside the scope of this thesis.
+After successful compilation, a \code{.log} file is saved alongside the \gls{edgetpu} model.
+This log reports, for each \gls{tfop}, whether mapping to the \gls{edgetpu} succeeded (and, if not, why),
+as illustrated by the \code{.log} excerpt shown right in the \autoref{fig:successcompile}.
 
-After a successfull compilation the \code{.log} file is saved along with the resulting ready-for-inference on \gls{edgetpu} model.
-This log provides additional information about each \gls{tfop} status of attempt to map it to \gls{edgetpu},
-as illustrated from a \code{.log} example on the right side of an <ref image>.
+One way to confirm that the entire model compiles for the \gls{edgetpu} is to visualize the compiled model in Netron.
+An example demonstrating that every \gls{tfop} was successfully mapped to the \gls{edgetpu} is shown left in the \autoref{fig:successcompile}.
+In contrast to the pre-compilation graphs (for example, see the \autoref{fig:qatconvertedquant}), no additional structural information is visible:
+all supported \glspl{tfop} have been fused into a single \code{edgetpu-custom-op} that executes exclusively on the \gls{edgetpu}.
+As shown, the input and output tensor shapes are readable, and the associated quantization scales and zero points can be inspected,
+as in \secshortref{subsubsec:optquant}; no further details are exposed.
 
-One way of confirming the full model compilation on the \gls{edgetpu} is to illustrate the resulting compiled model in Netron.
-An example from it of a successfull mapping on every single one \gls{tfop} onto \gls{edgetpu} is illustrated on the left image side <improve this>.
-In contrast to the models before compilation, e.g. illustrated on <ref image>, no additional structural information can be obtained from analyzing the graph.
-This is a result of fusing all regular \glspl{tfop} into a single \code{edgetpu-custom-op}, deemed only to play on \gls{edgetpu}.
-As it can be seen on the image, the input and output tensor shapes can be read off,
-as well as additional information about input and output quantization scales and zero-points can be gathered in a similar way as in \secshortref{subsubsec:optquant}.
-No more information provided.
-
+\begin{figure}[htbp]
 \begin{minipage}[t]{0.26\textwidth}\vspace{0pt} % check line 552
     \centering
     % Scale the image to fit half page width while keeping aspect ratio
     \includegraphics[width=\linewidth,keepaspectratio]{files/EdgeTPUCompiledModel.pdf}
-    \par\smallskip\footnotesize (a) Model structure diagram. % <-- add this
 \end{minipage}%
 \hspace{0.5cm plus 1fill} % if I use \hfill the overfull disappears 
 \begin{minipage}[t]{0.74\textwidth}\vspace{0pt}
@@ -638,18 +662,17 @@ No more information provided.
       CONV\_2D      & 15 & Mapped to Edge TPU \\
       TRANSPOSE\_CONV & 3 & Mapped to Edge TPU
     \end{tabular}
-
-    \par\smallskip\centering\footnotesize (b) Edge TPU compilation summary table. % <-- add this
     \vspace*{\fill}        % push up from bottom -> vertical centering
 \end{minipage}
+\caption{\gls{edgetpu}-mapped model (left) and compiler log excerpt (right).}
+\label{fig:successcompile}
+\end{figure}
 
-\todo{improve description}
-
-The final result is the \gls{edgetpu}-inference ready \code{.tflite} model file.
+The final artifact is a \code{.tflite} model file ready for \gls{edgetpu} inference.
 
 \subsection*{Technical Challenges}
 
-The \gls{devboard} is running on a end of life version of Mendel Linux v...  <check and paste link>, which is the only one latest officialy supported software version for \gls{devboard}.
+The \gls{devboard} is running on a end of life version of Mendel Linux, which is the only one latest officialy supported software version for \gls{devboard}.
 With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0 released on <verify version and maybe find date>, exposing a low-level C++ \gls{api}
 for direct interaction with \gls{edgetpu}. Consequently, this library version is the latest officially available in Coral repository for this Mendel Linux release.
 Building the newest one as of today from source requires more complex process using Bazel and potentially breaking dependencies and necessitates debugging,

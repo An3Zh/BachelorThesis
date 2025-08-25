@@ -44,7 +44,7 @@ Below the detailed description of both architectures is presented:
     where a residual connection with a $1\times1$ projection ensures feature dimension alignment and efficient gradient flow. Additionally,
     the integration of dropout regularization reduces overfitting, resulting in a more robust and generalizable feature representation at the network's deepest layer.
     These ideas are copied from \code{Cloud-Net} architecture.
-    To meet the limited \gls{edgetpu} \gls{sram} capacity, the decoder blocks were simplified by removing one \code{Conv2D} layer from each block,
+    To meet the limited \gls{edgetpu} static \gls{ram} capacity, the decoder blocks were simplified by removing one \code{Conv2D} layer from each block,
     except for the final decoder block before the output layer, which retains two \code{Conv2D} layers to preserve finer spatial resolution.
     Additionally, using \gls{bce} combined with \ensuremath{0.5 \cdot DiceLoss} as the loss function balances pixel-wise accuracy with overlap-based region matching,
     leading to better segmentation performance than plain \gls{bce} \cite{bcedice1, bcedice2}.

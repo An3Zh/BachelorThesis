@@ -256,7 +256,7 @@ An example scene is shown below in \autoref{fig:false_color_scene}:
 \end{figure}
 
 
-\section{Quantization}
+\section{Quantization Concept}
 \label{subsec:quantization}
 
 Quantization is a mathematical method that maps a large set of (typically continuous) values to a smaller, discrete and countable set.
@@ -385,7 +385,7 @@ The observed extrema are then used to set the quantization parameters for every 
 This trade-off maximally reduces model size and enables highly efficient inference using integer-only arithmetic.
 \end{itemize}
 
-\section{Hardware}
+\section{Google Coral Dev Board Mini}
 \label{subsec:hardware}
 
 Running machine or deep learning inference on embedded systems is referred to as edge inference.
@@ -401,7 +401,7 @@ Interface to the accelerator is provided by the \code{libedgetpu}\footnote{\url{
 To delegate tensor operations to the \gls{edgetpu} via \code{libedgetpu}, the model's operators must be compiled into the \code{edgetpu-custom-op} format.
 This compilation is performed by the \gls{edgetpu} Compiler\footnote{\url{https://coral.ai/docs/edgetpu/compiler/}} applied to the model.
 
-As a result, the following requirements\footnote{\url{https://coral.ai/docs/edgetpu/models-intro\#model-requirements}} apply to models:
+For \gls{edgetpu} compatibility, the model must meet the following requirements\footnote{\url{https://coral.ai/docs/edgetpu/models-intro\#model-requirements}}:
 
 \begin{itemize}
     \item Tensor parameters are quantized in \gls{int8} or \gls{uint8}
@@ -444,14 +444,14 @@ The following image summarizes the model conversion and deployment workflow\foot
   \label{fig:quantization-chart}
 \end{figure}
 
-\section{Design}
+\section{Methodology}
 
 \subsection*{Data}
 
 To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented.
 A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function.
 This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility.
-The function should output \code{tf.data.Dataset} objects\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/data/Dataset}} that are ready for immediate use in training pipelines.
+The function should output \code{tf.data.Dataset}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/data/Dataset}} objects that are ready for immediate use in training pipelines.
 
 Ideally, the testing pipeline should also be incorporated within this flexible, unified function.
 The absence of pre-cropped test subset \gls{gt} patches introduces the necessity for additional preparation steps.
