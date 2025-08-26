@@ -132,8 +132,6 @@ int stitchPatches(
 }
 
 int main() {
-    // [interactive picking code as before]
-    // ... same as previous version up to and including stitching ...
     const auto& sceneGridSizes = getSceneGridSizes();
 
     std::cout << "Available Scenes:\n";
