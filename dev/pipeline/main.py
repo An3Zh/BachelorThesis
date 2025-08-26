@@ -35,15 +35,15 @@ class Tee(object):
 # -----------------------------
 # Config (tune as needed)
 # -----------------------------
-batchSize         = 16      # increase if memory allows; if dropping to 1–2, consider freezing BN
-imgSize           = None
-imgSizeArch       = (384, 384)
+batchSize         = 16
+imgSize           = (192, 192)
+imgSizeArch       = (192, 192)
 numFilters        = 32
 numEpochs         = 200
-modelArchitecture = cloudNetQ
+modelArchitecture = improvedCloudEdgeQ
 valRatio          = 0.2
-trainValDSSize    = 5155    # raise above debug values if you have data
-numCalBatches     = 128     # more batches => better PTQ calibration
+trainValDSSize    = 5155
+numCalBatches     = 128      # more batches -> better PTQ calibration
 
 # -----------------------------
 # Data
@@ -77,7 +77,7 @@ def augmentBatch(xBatch, yBatch):
     xBatch = tf.image.rot90(xBatch, k)
     yBatch = tf.image.rot90(yBatch, k)
 
-    # random crop (one box for the whole batch → tiny & fast)
+    # random crop
     def applyCrop(x, y):
         cropFrac = tf.constant(0.9, tf.float32)  # keep 90% area
         y1 = tf.random.stateless_uniform([], seed=seed + 3, minval=0.0, maxval=1.0 - cropFrac)
@@ -97,7 +97,7 @@ def augmentBatch(xBatch, yBatch):
     doCrop = tf.random.stateless_uniform([], seed=seed + 5) > 0.5
     xBatch, yBatch = tf.cond(doCrop, lambda: applyCrop(xBatch, yBatch), lambda: (xBatch, yBatch))
 
-    # photometric (image only)
+    # photometric
     xBatch = tf.image.stateless_random_brightness(xBatch, max_delta=0.05, seed=seed + 6)
     xBatch = tf.image.stateless_random_contrast(xBatch, lower=0.95, upper=1.05, seed=seed + 7)
     xBatch = tf.clip_by_value(xBatch, 0.0, 1.0)
@@ -141,9 +141,9 @@ model.compile(
     loss=bceDiceLoss,
     metrics=[
         'accuracy',
-        BinaryIoU(threshold=0.5),        # interpretable per-epoch IoU
-        diceCoefficient,                  # your dice metric
-        AUC(curve='PR', name='AUC_PR'),   # aligns with PRC thresholding step
+        BinaryIoU(threshold=0.5),      
+        diceCoefficient,               
+        AUC(curve='PR', name='AUC_PR'),
         Precision(name='precision'),
         Recall(name='recall')
     ]
@@ -212,7 +212,7 @@ with open(f'{runFolder}/training_history.json', "w") as f:
     json.dump(history.history, f, indent=4, default=str)
 
 # -----------------------------
-# PRC on validation (pooled pixels) — keep your existing evaluation
+# PRC on validation (pooled pixels)
 # -----------------------------
 yScoresList, yTrueList = [], []
 for xBatch, gtBatch in valDS.take(valSteps):

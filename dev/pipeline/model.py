@@ -400,13 +400,13 @@ def bottleneckResidualDropoutQ(x, filters, name, dropoutRate=0.15):
     Side path: 1x1 projection from the bottleneck input (x) to match `filters`
     Fuse via Add -> ReLU -> Dropout.
     """
-    # main path (reuse your existing block)
+    # main path
     mainPath = quantConvBlock(x, filters, name=f"{name}_main")
 
     # side 1x1 projection
     sidePath = quantConv1x1(x, filters, name=f"{name}_side")
 
-    # fuse + relu + dropout (dropout is training-only; fine for TPU/QAT)
+    # fuse + relu + dropout (dropout is training-only)
     fused = tf.keras.layers.Add(name=f"{name}_add")([mainPath, sidePath])
     fused = Activation('relu', name=f"{name}_out_act")(fused)
     fused = tf.keras.layers.Dropout(dropoutRate, name=f"{name}_dropout")(fused)
@@ -416,7 +416,6 @@ def BIGCloudNetQ(batchShape, filters=32):
     inputs = Input(batch_shape=batchShape)
 
     # Encoder (6 blocks)
-    # 16-filter stem (paper-like, cheap)
     stem = quantize_annotate_layer(
         Conv2D(16, 3, padding='same', activation='relu', name="stem_conv16")
     )(inputs)

@@ -10,8 +10,7 @@ from matplotlib import pyplot as plt
 from load import buildDS, stitchPatches, getSceneGridSizes  # dataset + stitching
 
 # ------------ Config ------------
-# IMPORTANT: model expects batch=16 → use 16 here
-batchSize     = 16
+batchSize     = 16                    #EXPERIMENTAL SETUP
 imgSize       = (192, 192)
 singleSceneID = 3052                  # 0 for random, or pick a specific ID
 upsample      = imgSize is not None
@@ -22,13 +21,14 @@ runFolder     = baseFolder / "run_20250719_170647"
 tfliteModelPath = runFolder / "model_fp32_dynamic.tflite"  # the one you just exported
 saveFolder    = runFolder / "evaluationQ" / "inference"
 
+#EXPERIMENTAL
 assert "edgetpu" not in tfliteModelPath.name.lower(), \
     "EdgeTPU-compiled model on CPU is extremely slow. Use a plain FP32/INT8 .tflite on PC."
 
 # ------------ Data ------------
 (trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
     includeTestDS=True,
-    batchSize=batchSize,     # ← feed 16 patches per step
+    batchSize=batchSize,   
     imgSize=imgSize,
     singleSceneID=singleSceneID
 )
@@ -48,8 +48,8 @@ interpreter.allocate_tensors()
 inDet  = interpreter.get_input_details()[0]
 outDet = interpreter.get_output_details()[0]
 
-# Sanity: confirm it really wants 16
-expectedB = int(inDet['shape'][0])  # likely 16
+# EXPERIMENTAL
+expectedB = int(inDet['shape'][0]) 
 assert expectedB == batchSize, f"Model expects batch={expectedB}, but batchSize={batchSize}."
 
 # ------------ Run Inference ------------

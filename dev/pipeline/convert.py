@@ -12,7 +12,7 @@ def representativeDatasetGen(imgSize, numCalBatches):
 
     trainDS, _, _, _, _, _ = buildDS(includeTestDS=False, batchSize=batchSize, imgSize=imgSize)
     i = 0
-    for xBatch, _ in trainDS.take(numCalBatches):  # You can increase this if needed
+    for xBatch, _ in trainDS.take(numCalBatches):
         print(f"Calibration batch {i}")
         i+=1
         yield [xBatch]
@@ -28,7 +28,7 @@ def ConvertToTflite(model, runFolder, imgSize, numCalBatches):
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.representative_dataset = lambda: representativeDatasetGen(imgSize, numCalBatches)
     converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    converter.inference_input_type = tf.int8
+    converter.inference_input_type = tf.int8    # set i/o to int8 or uint8 quantization
     converter.inference_output_type = tf.int8
     tfliteModel = converter.convert()
     tflite_model_quant_file = Path(runFolder) / "quant.tflite"
