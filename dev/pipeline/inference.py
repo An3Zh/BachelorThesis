@@ -14,11 +14,11 @@ from pathlib import Path
 
 # --- Config ---
 batchSize     = 16
-imgSize       = None #(192, 192)
-singleSceneID = None            # None → full test set (all scenes)
-Upsample      = imgSize is not None           # set True if you want per-patch upsampling
-BaseFolder    = Path(r"c:\Users\aleks\Documents\An3BA\dev\pipeline\results\runs")
-runFolder     = BaseFolder / "run_20250817_143934_4ch_384"
+imgSize       = (192,192)            # None for (384,384)
+singleSceneID = None                 # None - full test set, all scenes. 0 for random scene, or specify ID
+Upsample      = imgSize is not None  # only if not full resolution
+BaseFolder    = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
+runFolder     = BaseFolder / "run_20250817_154643_4ch_192"
 modelPath     = runFolder / "endModel.h5"
 saveFolder    = runFolder / "evaluation" / "inference"
 
@@ -27,7 +27,7 @@ saveFolder    = runFolder / "evaluation" / "inference"
     includeTestDS=True,
     batchSize=batchSize,
     imgSize=imgSize,
-    singleSceneID=singleSceneID  # 0 for random single scene, None for full dataset
+    singleSceneID=singleSceneID
 )
 
 # --- Scene metadata ---
@@ -52,7 +52,7 @@ def runScene(sceneId: int):
     cols, rows = sceneGridSizes[sceneId]
     total = math.ceil((cols * rows) / batchSize)
 
-    # Build a per-scene dataset so we only keep one scene in memory
+    # Build a per-scene dataset
     (_, _, _, _, sceneDS, _) = buildDS(
         includeTestDS=True,
         batchSize=batchSize,
@@ -70,7 +70,7 @@ def runScene(sceneId: int):
     if Upsample:
         preds = [tfi.resize(p, [384, 384], method="bilinear").numpy() for p in preds]
 
-    # Stitch just this scene and save
+    # Stitch scene and save
     predArray = np.array([np.squeeze(p) for p in preds])   # [N,H,W]
     stitched  = stitchPatches(predArray, sceneId)          # {sceneId: canvas}
 
@@ -83,7 +83,7 @@ def runScene(sceneId: int):
 
 # --- Dispatch ---
 if singleSceneID_loaded is not None:
-    # Single scene mode (keeps original behavior)
+    # Single scene mode
     print(f"🧩 Inference for Scene {singleSceneID_loaded}")
     runScene(singleSceneID_loaded)
 else:

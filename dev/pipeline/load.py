@@ -84,14 +84,14 @@ def loadDS(
     x = tf.stack([r, g, b, n], axis=-1)                     # [H,W,4], uint16
     x = tf.cast(x, tf.float32) / 65535.0                    # [0,1] float32
     if imgSize is not None:
-        x = tf.image.resize(x, imgSize, method='bilinear')                     # [192,192,4]
+        x = tf.image.resize(x, imgSize, method='bilinear')  # [192,192,4]
 
     if gt is not None:
         gt = loadTIF(gt)
-        gt = tf.cast(gt > 0, tf.float32)                          # [0,1] float32
+        gt = tf.cast(gt > 0, tf.float32)                     # [0,1] float32
         if imgSize is not None:
             gt = tf.image.resize(gt[..., tf.newaxis], imgSize, method='nearest')    # [192,192,1]
-            gt = tf.squeeze(gt, axis=-1)                          # [192,192]
+            gt = tf.squeeze(gt, axis=-1)                     # [192,192]
         return x, gt
     else:
         return x, filename
@@ -203,7 +203,7 @@ def stitchPatches(yPred: np.ndarray, singleSceneID: int = None):
         for row in range(rows):
             for col in range(cols):
                 patch = yPred[i]
-                y0, y1 = row * patchH, (row + 1) * patchH
+                y0, y1 = row * patchH, (row + 1) * patchH    # gapless stitching
                 x0, x1 = col * patchW, (col + 1) * patchW
                 canvas[y0:y1, x0:x1] = patch
                 i += 1
@@ -248,7 +248,8 @@ if __name__ == "__main__":
             for ax in axs:
                 ax.axis('off')
             plt.tight_layout()
-            plt.savefig(f"train_vis/train_batch_0_sample_{i}.png")
+            #plt.savefig(f"train_vis/train_batch_0_sample_{i}.png")
+            plt.show()
             plt.close(fig)
 
     # --- Validation batch ---
@@ -271,5 +272,6 @@ if __name__ == "__main__":
             for ax in axs:
                 ax.axis('off')
             plt.tight_layout()
-            plt.savefig(f"val_vis/val_batch_0_sample_{i}.png")
+            #plt.savefig(f"val_vis/val_batch_0_sample_{i}.png")
+            plt.show()
             plt.close(fig)

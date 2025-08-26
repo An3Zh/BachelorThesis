@@ -21,6 +21,10 @@ SEED = 42
 random.seed(SEED); np.random.seed(SEED); tf.random.set_seed(SEED)
 os.environ["PYTHONHASHSEED"] = str(SEED)
 
+
+# -----------------------------
+# Log console output during training
+# -----------------------------
 class Tee(object):
     def __init__(self, *files):
         self.files = files
@@ -33,17 +37,17 @@ class Tee(object):
             f.flush()
 
 # -----------------------------
-# Config (tune as needed)
+# Config 
 # -----------------------------
-batchSize         = 16      # increase if memory allows; if dropping to 1–2, consider freezing BN
+batchSize         = 16
 imgSize           = (192, 192)
 imgSizeArch       = (192, 192)
 numFilters        = 32
 numEpochs         = 200
-modelArchitecture = cloudNetQ
+modelArchitecture = improvedCloudEdgeQ
 valRatio          = 0.2
-trainValDSSize    = 5155    # raise above debug values if you have data
-numCalBatches     = 128      # more batches => better PTQ calibration
+trainValDSSize    = 5155
+numCalBatches     = 128      # more batches -> better PTQ calibration
 
 # -----------------------------
 # Data
@@ -57,7 +61,7 @@ numCalBatches     = 128      # more batches => better PTQ calibration
     trainValDSSize=trainValDSSize
 )
 
-# Optional: lightweight augmentation (applied on batches)
+# lightweight augmentation (applied on batches)
 def augmentBatch(xBatch, yBatch):
     seed = tf.random.uniform([2], maxval=2**31-1, dtype=tf.int32)
 
@@ -65,19 +69,19 @@ def augmentBatch(xBatch, yBatch):
     if yBatch.shape.rank == 3:
         yBatch = yBatch[..., tf.newaxis]
 
-    # flips (same seeds for x/y)
+    # flips
     xBatch = tf.image.stateless_random_flip_left_right(xBatch, seed=seed)
     yBatch = tf.image.stateless_random_flip_left_right(yBatch, seed=seed)
 
     xBatch = tf.image.stateless_random_flip_up_down(xBatch, seed=seed + 1)
     yBatch = tf.image.stateless_random_flip_up_down(yBatch, seed=seed + 1)
 
-    # 0/90/180/270 rotation (mask-safe)
+    # 0/90/180/270 rotation
     k = tf.random.stateless_uniform([], minval=0, maxval=4, dtype=tf.int32, seed=seed + 2)
     xBatch = tf.image.rot90(xBatch, k)
     yBatch = tf.image.rot90(yBatch, k)
 
-    # random crop (one box for the whole batch → tiny & fast)
+    # random crop
     def applyCrop(x, y):
         cropFrac = tf.constant(0.9, tf.float32)  # keep 90% area
         y1 = tf.random.stateless_uniform([], seed=seed + 3, minval=0.0, maxval=1.0 - cropFrac)
@@ -97,14 +101,14 @@ def augmentBatch(xBatch, yBatch):
     doCrop = tf.random.stateless_uniform([], seed=seed + 5) > 0.5
     xBatch, yBatch = tf.cond(doCrop, lambda: applyCrop(xBatch, yBatch), lambda: (xBatch, yBatch))
 
-    # photometric (image only)
+    # photometric
     xBatch = tf.image.stateless_random_brightness(xBatch, max_delta=0.05, seed=seed + 6)
     xBatch = tf.image.stateless_random_contrast(xBatch, lower=0.95, upper=1.05, seed=seed + 7)
     xBatch = tf.clip_by_value(xBatch, 0.0, 1.0)
 
     return xBatch, tf.squeeze(yBatch, -1)
 
-# apply augmentation only to training stream
+# apply augmentation to training stream
 trainDS = trainDS.map(augmentBatch, num_parallel_calls=tf.data.AUTOTUNE)
 
 # -----------------------------
@@ -198,7 +202,7 @@ history = model.fit(
     callbacks=[checkpoint, earlyStop, lrReduce],
     steps_per_epoch=trainSteps,
     validation_steps=valSteps,
-    validation_freq=1,   # validate every epoch so callbacks work optimally
+    validation_freq=1,   # validate every epoch so callbacks work optimally or trade-off to less val freq to speed up training
     verbose=2
 )
 
@@ -212,7 +216,7 @@ with open(f'{runFolder}/training_history.json', "w") as f:
     json.dump(history.history, f, indent=4, default=str)
 
 # -----------------------------
-# PRC on validation (pooled pixels) — keep your existing evaluation
+# PRC on validation (pooled pixels)
 # -----------------------------
 yScoresList, yTrueList = [], []
 for xBatch, gtBatch in valDS.take(valSteps):

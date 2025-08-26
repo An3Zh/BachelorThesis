@@ -10,8 +10,7 @@ from matplotlib import pyplot as plt
 from load import buildDS, stitchPatches, getSceneGridSizes  # dataset + stitching
 
 # ------------ Config ------------
-# IMPORTANT: model expects batch=16 → use 16 here
-batchSize     = 16
+batchSize     = 16                    #EXPERIMENTAL SETUP
 imgSize       = (192, 192)
 singleSceneID = 3052                  # 0 for random, or pick a specific ID
 upsample      = imgSize is not None
@@ -19,16 +18,13 @@ upsampleSize  = (384, 384)
 
 baseFolder    = Path(r"c:\Users\andre\Documents\BA\dev\pipeline\results\runs")
 runFolder     = baseFolder / "run_20250719_170647"
-tfliteModelPath = runFolder / "model_fp32_dynamic.tflite"  # the one you just exported
+tfliteModelPath = runFolder / "quant.tflite" 
 saveFolder    = runFolder / "evaluationQ" / "inference"
-
-assert "edgetpu" not in tfliteModelPath.name.lower(), \
-    "EdgeTPU-compiled model on CPU is extremely slow. Use a plain FP32/INT8 .tflite on PC."
 
 # ------------ Data ------------
 (trainDS, valDS, trainSteps, valSteps, testDS, singleSceneID) = buildDS(
     includeTestDS=True,
-    batchSize=batchSize,     # ← feed 16 patches per step
+    batchSize=batchSize,   
     imgSize=imgSize,
     singleSceneID=singleSceneID
 )
@@ -48,7 +44,7 @@ interpreter.allocate_tensors()
 inDet  = interpreter.get_input_details()[0]
 outDet = interpreter.get_output_details()[0]
 
-# Sanity: confirm it really wants 16
+# EXPERIMENTAL
 expectedB = int(inDet['shape'][0])  # likely 16
 assert expectedB == batchSize, f"Model expects batch={expectedB}, but batchSize={batchSize}."
 
@@ -65,14 +61,13 @@ for xBatch, _ in tqdm(testDS, total=totalBatches):
         feed = x
         take = b
     else:
-        # last partial batch → pad by repeating last sample to size 16
+        # last partial batch - pad by repeating last sample to size 16
         feed = np.concatenate([x, np.repeat(x[-1:,...], expectedB - b, axis=0)], axis=0)
         take = b
 
     interpreter.set_tensor(inDet['index'], feed.astype(inDet['dtype']))
     interpreter.invoke()
 
-    # COPY output to avoid holding internal buffer
     y = interpreter.get_tensor(outDet['index']).astype(np.float32)  # [16,H,W,1] float (FP32 model)
     y = y[:take]  # slice back to real batch size
 
