@@ -3,41 +3,31 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{1em}
 
-\chapter{Conclusion \& Outlook}
+\chapter{Conclusions \& Outlook}
 
-The objective of this thesis was to design, train and deploy a \gls{cnn} model for cloud segmentation on an embedded system \glsxtrlong{devboard}.
-To complete the objective a configurable training and a deployment pipelines were implemented.
-During this implementation phase, three major technical issues were discovered and successively solved,
-they are documented as three milestones in \secshortref{chapter:implementation}.
-Complete pipelines allowed to conveniently train, deploy and do the performance evaluation for five different \gls{cnn} networks,
-designed in the scope of this work.
-Particular attention was paid to tailoring these models for efficient inference on \gls{edgetpu}.
-Difficuilties and caveats of conversion and compilation of trained models were overcame
-and successful delegation of all tensor opertaions to \gls{edgetpu} is confirmed and documented.
+The objective of this thesis was to design, train, and deploy a \gls{cnn} model for cloud segmentation on an embedded system \glsxtrlong{devboard}.
+To achieve this objective, configurable training and deployment pipelines were implemented.
+During implementation, three major technical issues were identified and successively addressed; they are documented as milestones in \secshortref{chapter:implementation}.
+The complete pipelines enabled convenient training, deployment, and performance evaluation of five \gls{cnn} networks designed in this work.
+Particular attention was paid to tailoring these models for efficient inference on the \gls{edgetpu}.
+Difficulties and caveats in conversion and compilation were overcome, and the successful delegation of all tensor operations to the \gls{edgetpu} was confirmed and documented.
 
-Designed and evaluated \code{improvedCloudEdgeQ} architecture yields almost similar performance to the original \code{Cloud-Net} model\cite{CloudNet2019}.
-\code{improvedCloudEdgeQ}, utilizing only \gls{rgb} \ensuremath{192\times192} patches as inputs, achieved 75.85\% Jaccard Index,
-compared to \code{Cloud-Net}' 78.50\% on the same 20 scenes test set. This trades only a 3.38 \% performance decrease for a fast embedded system inference,
-that does not requires \gls{nir} input information and processes one scene from Landsat 8 dataset in <> s.
+The \code{improvedCloudEdgeQ} architecture achieved performance comparable to the original \code{Cloud-Net} \cite{CloudNet2019}.
+With \gls{rgb} inputs and \(\,192\times192\,\) patches, it reached a Jaccard Index of \(75.85\%\), versus \(\,78.50\%\) for \code{Cloud-Net} on the same 20 scene test set.
+This corresponds to a modest \(2.65\) percentage points (\(3.38\%\) relative) decrease in performance in exchange for fast embedded inference that does not require \gls{nir} input
+and processes one Landsat 8 scene in 216~s on the \gls{devboard}.
 
-There are several improvement suggestions, that can be made to different parts of the concluded work. These are stemming from the
-ideas and insights gathered over the course of development process. Here are some of them.
+Several improvements are suggested, based on insights gathered during development.
+An extension of the 38-Cloud dataset, as introduced in \cite{CloudNetNew}, could be used for more effective training.
+Architecture improvements proposed in \cite{CloudNetNew} can be adapted and ported to the \gls{devboard} using the pipelines developed here.
 
-An extension to 38 Cloud Dataset, already intoduced in \cite{CloudNetNew}, can be utilized for more extensive and effective training process.
-Model's architecture improvement techniques can be gathered from \cite{CloudNetNew}, modified and ported on \gls{devboard},
-utilizing provided pipelines from this work.
+When loading the model onto the \gls{edgetpu}, off-chip memory usage should be minimized to preserve inference speed.
+The error outlined in \secshortref{sec:deployment} should be investigated and eliminated to allow post-processing immediately after inference.
+The C++ inference implementation and the associated development experience enable further refinements,
+ultimately supporting adaptation of the deployment algorithms for onboard satellite use under space-grade requirements.
 
-
-By loading the model to \gls{edgetpu} the off-chip memory used has to be reduced to the minimum for faster inference.
-An error, outlined in \secshortref{sec:deployment} has to be investigated and eliminated to allow flawless postprocessing steps immediately after inference.
-C++ inference implementation and delevopment experience allows further improvements to eventually adapt the deployment algorithms for uploading them to satellite,
-taking space grade requirements into consideration.
-
-Finally, it can be said that this work lays the foundation for future exploration of the feasibility of \gls{cots} components in satellites.
-It allows the implementation of not only dummy tensor processing algorithms for radiation shielding tests,
-but actually constitutes a versatile tool ready to be utilized and improved
-for the development of sophisticated cloud segmentation algorithms for \gls{edgetpu} embedded systems.
-
-\todo{mention binary crossentropy compared to softJaccardLoss! Maybe this in evaluation.}
+Overall, this work lays a foundation for exploring the feasibility of \gls{cots} components in satellites.
+Beyond simple tensor-processing payloads for radiation tests, the resulting pipeline and models constitute a
+versatile toolchain for developing sophisticated cloud segmentation algorithms on \gls{edgetpu} based embedded systems.
 
 }

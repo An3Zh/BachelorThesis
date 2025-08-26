@@ -8,16 +8,15 @@
 
 A detailed description of the software development process used to achieve the thesis objective is provided in this chapter.
 Along the way, three major implementation milestones were reached. Despite several hurdles, success was achieved in
-(i) training the model on powerful cloud machines, (ii) mapping its all components, fully quantized, to the \gls{edgetpu},
+(i) training the model on powerful cloud machines, (ii) mapping all its components, fully quantized, to the \gls{edgetpu},
 and (iii) performing C++ inference on the \gls{devboard}.
 The technical obstacles and their resolution are presented in three “Technical Challenges” chapters inside
 \nameref{sec:training}, \nameref{sec:conversion}, and \nameref{sec:deployment}.
 
 Software developed in the scope of this work
-is made available for free and unrestricted use on the author's GitHub and TU Berlin GitLab profiles:
+is made available for free and unrestricted use on the author's GitHub profile:
 \begin{itemize}
   \item \url{https://github.com/An3Zh/BachelorThesis}
-  \item GitLab link
 \end{itemize}
 
 Details on relevant file locations, with references to this work's chapters,
@@ -33,7 +32,7 @@ The function was later extended to optionally include the test dataset, which wi
 
 Efficient data handling and memory management are achieved through the use of built-in \gls{tf} utilities.
 In particular, the \code{tf.Data.TextLineDataset}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/data/TextLineDataset}} function
-is employed to sequentionally read the \code{.csv} files,
+is employed to sequentially read the \code{.csv} files,
 which contain the patch filenames as outlined in \secshortref{subsec:dataset}.
 This provides the foundation for the dataset pipeline.
 
@@ -54,12 +53,12 @@ The \code{loadDS} and \code{loadTIF} functions perform the following operations:
 \end{itemize}
 
 An additional feature of the \code{loadDS} function allows for optional resizing of the input images if a target size is provided.
-The image loading and transormation pipeline is designed to avoid information loss until the controlled resizing step, where a reduction in resolution is intentional.
+The image loading and transformation pipeline is designed to avoid information loss until the controlled resizing step, where a reduction in resolution is intentional.
 In the case of resizing, \gls{gt} masks are resized using nearest-neighbor interpolation. This method copies the value of the closest original pixel for each target pixel,
 thus preserving hard edges in the cloud segmentation mask and avoiding the introduction of intermediate values.
 Conversely, the \gls{rgb} and \gls{nir} inputs are resized with bilinear interpolation,
 which computes each new pixel value as a weighted average of the nearest $2\times2$ neighborhood. This results in smooth pixel transitions while maintaining important image details.
-Nearest-neighbor interpolation is among the eraliest digital image resizing techniques, dating back to the origins of digital image processing in the 1960s,
+Nearest-neighbor interpolation is among the earliest digital image resizing techniques, dating back to the origins of digital image processing in the 1960s,
 whereas bilinear interpolation gained prominence in early computer graphics literature and is now standard in deep learning pipelines \cite{bilinearNearest1, bilinearNearest2}.
 
 As a final preparation step, the dataset is: shuffled, batched, set to repeat indefinitely,
@@ -121,7 +120,7 @@ In early development, the \code{simple} model architecture was implemented.
 It served as a proof of concept and was used for initial debugging of the training and conversion pipelines, as well as to obtain the first inference results on the \gls{devboard}.
 The model was not annotated for \gls{qat}.
 
-Below in \autoref{fig:quantnotquantcomp} are schown the examples of layer diagrams for two models: the left is not annotated for \gls{qat}, the right is annotated.
+Below, in \autoref{fig:quantnotquantcomp} are shown the examples of layer diagrams for two models: the left is not annotated for \gls{qat}, the right is annotated.
 These visualizations were produced with Netron\footnote{\url{https://netron.app/}}.
 Following the concept outlined in \secshortref{subsubsec:qat}, the \code{QuantizeWrapperV2} and \code{QuantizeLayer} \glspl{tfop} are inserted into the architecture,
 wrapping the base layers with quantize-dequantize operations.
@@ -251,7 +250,7 @@ behind full-integer operation execution on edge devices such as the \gls{edgetpu
 It should be noted that both \gls{qat} annotation and \gls{ptq} are already wrapped into convenient, ready-to-use \gls{tflite} commands.
 Thus, this section is not intended to teach the implementation of quantized models from scratch. Instead, it aims to offer a deeper understanding that can be beneficial for debugging, designing custom (potentially more powerful) models, or simply appreciating the engineering trade-offs between speed, memory, and accuracy on constrained devices.
 
-\subsection{Practical example of Model quantization}
+\subsection{Practical Example of Model Quantization}
 \label{subsubsec:optquant}
 
 Below, a \gls{qat} annotated part of the model is shown in the left panel of \autoref{fig:qatconvertedquant}.
@@ -429,7 +428,7 @@ Inspection of the 32 kernel value ranges (only Kernel No. 1 shown here) confirms
 This suggests that \gls{tf} enforces clipping of weight extremes to fit symmetric ranges.
 
 Netron reveals that Kernel No. 1 has the largest max value among the 32 kernels (not represented here),
-yet it still doesn't match the actual tensor extrema ($min=-0.4122757017612457, max=0.5442604422569275$),
+yet it still does not match the actual tensor extrema ($min=-0.4122757017612457, max=0.5442604422569275$),
 indicating that \gls{tf} may apply additional optimization, likely outlier-aware clipping or mean adjustment,
 since real values are not perfectly zero-mean ($mean=-0.005126346834471305$).
 A detailed investigation of this effect lies outside the scope of this work.
@@ -672,7 +671,7 @@ The final artifact is a \code{.tflite} model file ready for \gls{edgetpu} infere
 
 \subsection*{Technical Challenges}
 
-The \gls{devboard} is running on an end of life version of Mendel Linux, which is the only one latest officialy supported software version for \gls{devboard}.
+The \gls{devboard} is running on an end of life version of Mendel Linux, which is the only one latest officially supported software version for \gls{devboard}.
 With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0, exposing a low-level C++ \gls{api}
 for direct interaction with \gls{edgetpu}. Consequently, this library version is the latest officially available in Coral repository for this Mendel Linux release.
 Building the latest version from source entails a more complex Bazel-based process that risks breaking dependencies and incurs a nontrivial debugging burden; 
@@ -1021,7 +1020,7 @@ Instead, chunked processing is used, enabling conversion of larger full resoluti
 The final significant implementation milestone in this work was building the \gls{tflite} C++ \gls{api} library for the \gls{devboard} from source.
 As shown in \autoref{fig:runflow}, this library is crucial for implementing pure C++ inference.
 
-Guidance for this task is only sparsely mentioned in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/tflite-cpp/\#build-your-project-with-libedgetpu}}.
+Guidance for this task is sparse in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/tflite-cpp/\#build-your-project-with-libedgetpu}}.
 Taking those notes into account, a compatible \gls{tflite} version for the \code{libedgetpu} runtime preinstalled on the \gls{devboard} had to be determined.
 The installed \code{libedgetpu} was identified as v16.0. However, the releases page\footnote{\url{https://github.com/google-coral/libedgetpu/releases}}
 does not use a consistent numeric versioning convention, so the modification date of the \code{libedgetpu.so.1} symlink was used to approximate the release.

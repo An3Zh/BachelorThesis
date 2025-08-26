@@ -53,93 +53,89 @@ Necessary simplifications were made.
 Both \code{earlyCloudEdgeQ} and \code{improvedCloudEdgeQ} can be examined in more detail in \code{model.py} and compared with the original \code{Cloud-Net} model
 architecture.\footnote{\url{https://github.com/SorourMo/Cloud-Net-A-semantic-segmentation-CNN-for-cloud-detection/blob/master/Cloud-Net/cloud_net_model.py}}
 
-The following table details the differences between the models, reporting the number of input channels (CH),
-input-patch size (In size), number of trainable parameters in millions (Params (M)), number of training epochs (Epochs),
+\autoref{tab:model_comparison} details the differences between the models, reporting the number of input channels (CH),
+input-patch size (In size), number of trainable parameters in millions (Params (M)),
+number of training epochs (Epochs, suffixed with \code{eS} if \code{EarlyStopping} was triggered),
 estimated arithmetic operations in billions (Ops (B)), on-chip/off-chip memory used to cache model parameters (On-chip (MB) / Off-chip (KB)),
-and the per-batch inference time on the \gls{devboard} (Inf. Time (ms)).
+and the average per-batch inference time on the \gls{devboard} (Inf. Time (ms)).
 
 \begin{table}[h!]
 \centering
-\label{tab:model_comparison}
 \renewcommand{\arraystretch}{1.3}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|}
 \hline
 \textbf{Model} & \textbf{CH} & \textbf{In size} & \textbf{Params (M)} & \textbf{Epochs} & \textbf{Ops (B)} & \textbf{On-chip (MB)} & \textbf{Off-chip (KB)} & \textbf{Inf. Time (ms)} \\ \hline
-early      & 4 & 192 & 1.9 & 100  & 10.4 & 1.9 & 46  & 15.2 \\ \hline
-improved~1 & 3 & 192 & 6.0 & 54   & 11.6 & 5.7 & 342 & 20.5 \\ \hline
-improved~2 & 3 & 384 & 6.0 & 46   & 46.3 & 6.0 & 349 & 12.7 \\ \hline
-improved~3 & 4 & 192 & 6.0 & 51   & 11.6 & 5.7 & 342 & 10.3 \\ \hline
-improved~4 & 4 & 384 & 6.0 & 45   & 46.4 & 6.0 & 349 & 25.8 \\ \hline
+early      & 4 & 192 & 1.9 & 100  & 10.4 & 1.9 & 46  & 506 \\ \hline
+improved~1 & 3 & 192 & 6.0 & 54 eS   & 11.6 & 5.7 & 342 & 514 \\ \hline
+improved~2 & 3 & 384 & 6.0 & 46 eS   & 46.3 & 6.0 & 349 & 2435 \\ \hline
+improved~3 & 4 & 192 & 6.0 & 51 eS   & 11.6 & 5.7 & 342 & 515 \\ \hline
+improved~4 & 4 & 384 & 6.0 & 45 eS   & 46.4 & 6.0 & 349 & 2440 \\ \hline
 \end{tabular}%
 }
-\caption{Comparison of model properties and deployment metrics}
+\caption{Model properties and deployment metrics.}
+\label{tab:model_comparison}
 \end{table}
 
-\todo{inference time coral and add learnable params!}
+Models were evaluated on a test set containing 20 scenes.
+The evaluation metrics defined in \secshortref{subsec:evalmetrics}, IoU, Dice coefficient, Precision, Recall,
+and Accuracy, were computed per scene and then averaged. This averaging does not bias the results because all scenes are approximately the same size.
 
-Models were evaluated on a test set, containing 20 scenes. The evaluation metrics, outlined in \secshortref{subsec:evalmetrics}
-were calculated per scene and then averaged:
-IoU, Dice Coefficient, Precision, Recall, Accuracy. Averaging does not skew the results, because all scene are of approximately the same size.
-Furthermore, for each model except \code{early} the best binarization threshold was calculated immediately after the training precess,
-utilizing the bestF1 score, obtained on a validation set.
-This improves model to be inference-ready with its own calibrated best threshold for immediate binarization of predicted masks.
-For \code{early} model no threshold was calculated, since to the point of its training, the feature was not yet implemented.
-Features for the reproducibility of shuffling the datasets were not implemented at the time too,
-leaving no chance to perform \code{PRC} evaluation on the same validation set to make up for the best validation threshold.
-In addition to determining the optimal threshold from the validation set,
-a per-scene threshold was computed individually for each of the 20 test scenes and subsequently averaged.
-This procedure is even more optimistic than selecting a single global test threshold,
-since it implicitly adapts to each test scene and therefore overestimates true generalization performance.
-Nonetheless, presenting these results is useful, as it illustrates the upper bound of performance
-achievable under ideal threshold tuning and underscores the strong influence of threshold choice on segmentation quality.
-The final evaluation results are represented on three column chart below,
-whereas second and third charts are derived from the first one, splitting between validation set threshold and test set threshold
-for better visual comparison possibility.
-\code{improvedCloudEdgeQ} models are represented only by their parameters configuration, such as number of input channels and input patch' size,
-\code{earlyCloudEdgeQ} is highlighted additionally as \code{early} model. 
+For all models except \code{early}, the binarization threshold was calibrated immediately after training by selecting the \code{bestF1} on the validation set,
+yielding an inference-ready model with its own threshold for mask binarization. For \code{early}, no threshold was computed because the feature had not yet been implemented.
+Reproducible dataset shuffling was also not available at that time, precluding a comparable PRC evaluation on the same validation set.
+
+In addition to the validation threshold, a per-scene threshold was computed for each of the 20 test scenes and then averaged.
+This procedure is even more optimistic than using a single global test threshold, since it adapts to each scene and thus overestimates true generalization performance.
+Nevertheless, reporting these results is useful:
+they illustrate an upper bound under ideal threshold tuning and underscore the strong influence of threshold choice on segmentation quality.
+
+\clearpage
+The results are shown in \autoref{fig:evalresults} below.
+The second and third panels are derived from the first by splitting results by validation threshold versus test threshold for clearer visual comparison.
+\code{improvedCloudEdgeQ} models are labeled by configuration (number of input channels and input patch size), and \code{earlyCloudEdgeQ} is additionally marked as \code{early}.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth]{files/evalRes.pdf}
-  \caption{The basic workflow to create a model for the Edge TPU}
-  \label{fig:evalres}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
+  
+  % First: full width
   \begin{subfigure}[t]{\textwidth}
     \centering
-    \includegraphics[width=\textwidth,height=0.45\textheight,keepaspectratio]{files/valSetThr.pdf}
-    \caption{Links}
+    \includegraphics[width=\textwidth]{files/evalRes.pdf}
   \end{subfigure}
-  \vspace{0.8em}
-  \begin{subfigure}[t]{\textwidth}
+
+  % Second row: two half-widths, no gap
+  \begin{subfigure}[t]{0.5\textwidth}
     \centering
-    \includegraphics[width=\textwidth,height=0.45\textheight,keepaspectratio]{files/testSetThr.pdf}
-    \caption{Rechts}
+    \includegraphics[width=\textwidth]{files/valSetThr.pdf}
+  \end{subfigure}%
+  \begin{subfigure}[t]{0.5\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{files/testSetThr.pdf}
   \end{subfigure}
-  \caption{Zwei Diagramme übereinander (als PDF).}
+
+  \caption{Evaluation Results}
+  \label{fig:evalresults}
 \end{figure}
 
-By analizing these results, following key insights can be made:
+
+By analyzing these results, the following key insights emerge:
 \begin{itemize}
-    \item A general upward performance trend can clearly be seen with increasing input patch resolution and with addition of \gls{nir} channel.
-    This is expected, as the model benifits from additional input information sources.
-    \item \code{improvedCloudEdgeQ} architecture performs generally better than \code{earlyCloudEdgeQ} given the architecture improvements.
-    \item At input size \ensuremath{192\times192}, adding the \gls{nir} channel did not improve recall and in fact led to a slight reduction,
-    when analizing the validation threshold. This effect likely arises because the additional spectral information increases input dimensionality without
-    providing sufficient spatial context at the lower resolution. As a result, the model becomes more conservative at cloud boundaries and thin structures,
-    which reduces false positives but slightly increases the number of missed cloud pixels, leading to lower recall.
-    \item The accuracy metric is constanltly at a very high level, but it has better not to be qualified as a reliable metric in the
-    cloud segmentation case, as explained in \secshortref{subsec:evalmetrics}. <TODO EXPLAIN THERE>
+    \item A general upward performance trend is evident with increasing input patch resolution and with the addition of the \gls{nir} channel.
+    This is expected, as the model benefits from additional spectral information.
+    \item \code{improvedCloudEdgeQ} generally outperforms \code{earlyCloudEdgeQ}, consistent with its architectural refinements.
+    \item At \ensuremath{192\times192} input size, adding \gls{nir} did not improve recall and in fact led to a slight reduction (when using the validation-derived threshold).
+    A likely cause is that the extra spectral channel increases input dimensionality without providing sufficient spatial context at the lower resolution:
+    the model becomes more conservative at cloud boundaries and thin structures, reducing false positives but slightly increasing missed cloud pixels (lower recall).
+    \item Accuracy is consistently very high, but it should not be treated as a reliable metric for cloud segmentation.
+    If non cloud pixels vastly outnumber cloud pixels,
+    accuracy is dominated by true negatives, so even a model that misses many clouds can score highly: hence IoU, Dice, Precision, and Recall are preferred.
 \end{itemize}
 
-Based on the evaluation metrics and taking the inference time on \gls{devboard} into consideration the \code{improvedCloudEdgeQ} model,
-with \gls{rgb} and \code{nir} input channels as well as \ensuremath{192\times192} spatial resolution, is proposed as the best suitable model
-out of all trained and evaluated models in the scope of this work. This model represents the golden middle between edge device inference speed
-and performance metrics.
-However, if the input data lacks \code{nir} channel, providing only \code{rgb} imagery, the best model is chosen to be
-\code{improvedCloudEdgeQ} of \ensuremath{384\times384}, trading significantly increased inference time for the more than acceptable performance.
+Considering the evaluation metrics together with inference time on the \gls{devboard},
+the \code{improvedCloudEdgeQ} model with \gls{rgb}+\gls{nir} inputs and \ensuremath{192\times192} resolution is recommended as the most suitable choice in this work,
+striking a balance between edge-device speed and segmentation quality.
+However, if \gls{nir} channel is unavailable, the preferred model is \code{improvedCloudEdgeQ} at \ensuremath{384\times384},
+trading a significantly longer inference time for stronger performance.
 
 }

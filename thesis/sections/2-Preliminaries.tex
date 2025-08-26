@@ -16,7 +16,7 @@ surface-focused analyses or to study the cloud field itself, both of which requi
 In time-series for weather forecasting, the motion of cloud layers can be tracked and predicted by expert analysts.
 Automating this process is one precise example where cloud segmentation is essential.
 
-Early segmenation workflows relied on manual inspection and empirical thresholding.
+Early segmentation workflows relied on manual inspection and empirical thresholding.
 Over the years, these evolved into image processing methods, then classical machine learning,
 and today into deep learning models, most notably \glspl{cnn}, to achieve reliable, scalable cloud segmentation.
 
@@ -218,7 +218,7 @@ The corresponding components are:
 
 \begin{tabularx}{0.97\textwidth}{@{\hspace{\parindent}}>{\ttfamily}p{2.7cm}@{\hspace{0.3em}}L}
 \textbf{band} \dotfill & Indicates the spectral band or \gls{gt} mask. \\
-\textbf{index} \dotfill & Ordinal number of the patch within the scene. Patches are extracted sequentionally from left to right, top to bottom. \\
+\textbf{index} \dotfill & Ordinal number of the patch within the scene. Patches are extracted sequentially from left to right, top to bottom. \\
 \textbf{row \& col} \dotfill & Patch's position in the scene, specified by its row and column indices. \\
 \textbf{metadata} \dotfill & Encodes the satellite and sensor ID, preprocessing precision, scene path/row, acquisition and processing dates, and collection tier metadata. \\
 \end{tabularx}
@@ -268,7 +268,7 @@ This technique is now widely employed in machine learning \cite{MLQuantization1,
 Quantization significantly reduces model size \cite{quantcompression} by compressing numerical precision, typically at the cost of a controlled reduction in accuracy.
 Two primary quantization methods are commonly used: general asymmetric zero-point quantization, and its special case ---
 symmetric absolute maximum (absmax) quantization.
-In the context of this work, the general asymetric approach is of primary importance.
+In the context of this work, the general asymmetric approach is of primary importance.
 
 To perform quantization, the boundaries \( x_{\text{min}} \) and \( x_{\text{max}} \) of the original (floating-point) range,
 and \( q_{\text{min}} \) and \( q_{\text{max}} \) of the target (quantized) value set must be defined.
@@ -432,7 +432,7 @@ TransposeConv  & $\geq$13 & — \\
 \end{table}
 
 
-These requirements directly affect model architecture, training strategy, and tooling. For instance, certain operations unsopported by \gls{edgetpu} must be avoided,
+These requirements directly affect model architecture, training strategy, and tooling. For instance, certain operations unsupported by \gls{edgetpu} must be avoided,
 \gls{ptq} and \gls{qat} must be considered early in the development process.
 
 The following image summarizes the model conversion and deployment workflow\footnote{\url{https://coral.ai/docs/edgetpu/models-intro\#compatibility-overview}}:
@@ -450,7 +450,7 @@ The following image summarizes the model conversion and deployment workflow\foot
 
 To efficiently utilize \gls{tf}'s dataset loading and preprocessing capabilities, a versatile data handling method has to be implemented.
 A core idea behind this approach is to unify the preparation of training, validation and test subsets within a single configurable function.
-This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistensy and flexibility.
+This function must manage all aspects of dataset construction and transformation according to user-defined parameters, thereby ensuring consistency and flexibility.
 The function should output \code{tf.data.Dataset}\footnote{\url{https://www.tensorflow.org/api_docs/python/tf/data/Dataset}} objects that are ready for immediate use in training pipelines.
 
 Ideally, the testing pipeline should also be incorporated within this flexible, unified function.
@@ -463,7 +463,7 @@ The model architecture is tailored for deployment on embedded systems, where \gl
 Due to the lack of existing practical examples for deploying this specific model architecture on \gls{edgetpu},
 the design process begins with a minimal configuration, using the smallest feasible number of layers and filters,
 and gradually increases in complexity based on deployment outcomes and evaluation feedback.
-An iterative, trial-and-error methodology is employed, allowing for adjustments in response to the resource constrains encountered on embedded hardware.
+An iterative, trial-and-error methodology is employed, allowing for adjustments in response to the resource constraints encountered on embedded hardware.
 
 The objective is to implement multiple configurable functions, each responsible for constructing a distinct model architecture.
 These functions include all necessary helper routines and utilities required to assemble the desired architecture,
@@ -491,8 +491,7 @@ After training, the model must be converted and compiled for \gls{edgetpu} infer
 A modular approach is important here as well, simplifying debugging and ensuring correct conversion and compilation during early development.
 Later on, the integration of the conversion process directly into the training pipeline is ideal for convenience and efficiency.
 
-Automated use of the \gls{edgetpu} Compiler,
-is required so that the entire training and conversion pipeline outputs a model ready for deployment on the \gls{devboard}.
+Automated use of the \gls{edgetpu} Compiler is required so that the entire training and conversion pipeline outputs a model ready for deployment on the \gls{devboard}.
 
 \subsection*{Deployment}
 %\label{subsec:designdep}
