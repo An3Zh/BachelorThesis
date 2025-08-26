@@ -9,21 +9,22 @@
 % Page layout
 \usepackage[a4paper, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm]{geometry} %showframe
 
-% Essential packages
-%\usepackage{minted}
-%\usemintedstyle{emacs} %default, xcode, friendly
-%\usepackage{xcolor}
-%%\definecolor{bg}{rgb}{0.95,0.95,0.95} % light gray background
-%%\definecolor{codebg}{rgb}{0.97,0.97,0.97}   % very light gray background
-%\definecolor{codeline}{rgb}{0.7,0.7,0.7}    % subtle line number color
-%\setminted{
-%  linenos,
-%  breaklines,
-%  frame=lines,
-%  framesep=2mm,
-%  fontsize=\small,
-%  numbersep=5pt
-%}
+% Minte packages
+\usepackage{minted}
+\usemintedstyle{emacs} %default, xcode, friendly
+\usepackage{xcolor}
+%\definecolor{bg}{rgb}{0.95,0.95,0.95} % light gray background
+%\definecolor{codebg}{rgb}{0.97,0.97,0.97}   % very light gray background
+\definecolor{codeline}{rgb}{0.7,0.7,0.7}    % subtle line number color
+\setminted{
+  linenos,
+  breaklines,
+  frame=lines,
+  framesep=2mm,
+  fontsize=\small,
+  numbersep=5pt
+}
+
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning}
 \usepackage{graphicx}

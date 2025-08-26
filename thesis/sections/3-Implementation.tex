@@ -334,7 +334,7 @@ The goal is to illustrate, using a practical example, the error effects of quant
 \end{layerbox}
 
 \clearpage
-\subsubsection*{Model after quantization (right in \autoref{fig:qatconvertedquant})}
+\subsubsection*{Model After Quantization (right in \autoref{fig:qatconvertedquant})}
 
 \begin{layerbox}{Layer Type: Conv2D}{Layer Name: Conv2D No. 1}
   \begin{center}
@@ -617,7 +617,7 @@ In the scope of this thesis, however, only a single \gls{edgetpu} is used.
 Therefore, the on-chip static \gls{ram} should ideally not be exceeded to preserve inference speed.
 Falling back to external memory can degrade performance due to parameter reloads.
 
-From this log example, useful information about memory usage can be inferred.
+From the \autoref{lst:edgetpu_compilation} log example, useful information about memory usage can be inferred.
 The model executable occupies approximately \(8 - 1.90 - 3.82 \approx 2.28\,\mathrm{MiB}\) of the \gls{edgetpu} on-chip cache.
 Its parameters occupy \(1.90\,\mathrm{MiB}\), leaving \(3.82\,\mathrm{MiB}\) free, thus, the entire model is stored in the \gls{edgetpu}'s static \gls{ram}.
 In \secshortref{chapter:evaluation}, memory usage is also considered when comparing different models.
@@ -626,11 +626,11 @@ The reason is not documented officially and likely requires deeper investigation
 
 After successful compilation, a \code{.log} file is saved alongside the \gls{edgetpu} model.
 This log reports, for each \gls{tfop}, whether mapping to the \gls{edgetpu} succeeded (and, if not, why),
-as illustrated by the \code{.log} excerpt shown right in the \autoref{fig:successcompile}.
+as illustrated by the \code{.log} excerpt shown right in \autoref{fig:successcompile}.
 
 One way to confirm that the entire model compiles for the \gls{edgetpu} is to visualize the compiled model in Netron.
-An example demonstrating that every \gls{tfop} was successfully mapped to the \gls{edgetpu} is shown left in the \autoref{fig:successcompile}.
-In contrast to the pre-compilation graphs (for example, see the \autoref{fig:qatconvertedquant}), no additional structural information is visible:
+An example demonstrating that every \gls{tfop} was successfully mapped to the \gls{edgetpu} is shown left in \autoref{fig:successcompile}.
+In contrast to the pre-compilation graphs (for example, see \autoref{fig:qatconvertedquant}), no additional structural information is visible:
 all supported \glspl{tfop} have been fused into a single \code{edgetpu-custom-op} that executes exclusively on the \gls{edgetpu}.
 As shown, the input and output tensor shapes are readable, and the associated quantization scales and zero points can be inspected,
 as in \secshortref{subsubsec:optquant}; no further details are exposed.
@@ -672,46 +672,51 @@ The final artifact is a \code{.tflite} model file ready for \gls{edgetpu} infere
 
 \subsection*{Technical Challenges}
 
-The \gls{devboard} is running on a end of life version of Mendel Linux, which is the only one latest officialy supported software version for \gls{devboard}.
-With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0 released on <verify version and maybe find date>, exposing a low-level C++ \gls{api}
+The \gls{devboard} is running on an end of life version of Mendel Linux, which is the only one latest officialy supported software version for \gls{devboard}.
+With the OS itself comes already pre-installed runtime library \code{libedgetpu} of version v16.0, exposing a low-level C++ \gls{api}
 for direct interaction with \gls{edgetpu}. Consequently, this library version is the latest officially available in Coral repository for this Mendel Linux release.
-Building the newest one as of today from source requires more complex process using Bazel and potentially breaking dependencies and necessitates debugging,
-which lies outside the scope of this thesis.
-The newest as of today \gls{edgetpu} Compiler version v16.0 was, however, used,
-requiring runtime minimum runtime version v14.0\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#compiler-and-runtime-versions}},
-which was fully compatible with \code{libedgetpu} v16.0.
+Building the latest version from source entails a more complex Bazel-based process that risks breaking dependencies and incurs a nontrivial debugging burden; 
+this lies outside the scope of this thesis.
 
-\todo{explain it inHardware, rename Hardware to Edge Device or something, because explain there Hardware + libedgetpu + Compiler + tflite 2.5 on device}
+The newest as of today \gls{edgetpu} Compiler version v16.0 is used,
+requiring minimum\footnote{\url{https://coral.ai/docs/edgetpu/compiler/\#compiler-and-runtime-versions}} runtime version v14.0,
+which is fulfilled by \code{libedgetpu} v16.0.
 
-At a very early development stages, it was, however, not clear, which is the latest supported \gls{tf} version for the provided runtime library and compiler,
-as the related information cannot be found in official documents.
-Hence, heuristically the newest \gls{tf} version v2.19.0 (at the timepoint this work was conducted) was utilized for the first tries of dataset pipeline building,
-model architecting, training and conversion. No \gls{qat} annotation was performed, solely relying on \gls{ptq} before compiling the model for \gls{edgetpu} trial inference.
-At a compile time, the following error from \gls{edgetpu} Compiler was encountered:
+At early development stages, it was unclear which \gls{tf} version was supported by the provided runtime library and compiler,
+as this information was not available in the official documentation.
+Consequently, the newest \gls{tf} version, v2.19.0 (at the time this work was conducted), was used heuristically for initial attempts at dataset pipeline construction,
+model architecture, training, and conversion.
+No \gls{qat} annotation was performed, relying solely on \gls{ptq} prior to compiling the model for trial inference on the \gls{edgetpu}.
+At compile time, the following error from the \gls{edgetpu} Compiler was encountered:
 
 \begin{lstlisting}
 Edge TPU Compiler version 16.0.384591198
-ERROR: Didn't find op for builtin opcode 'TRANSPOSE_CONV' version '4'. An older version of this builtin might be supported. Are you using an old TFLite binary with a newer model?
+ERROR: Didn't find op for builtin opcode 'TRANSPOSE_CONV' version '4'.
+An older version of this builtin might be supported.
+Are you using an old TFLite binary with a newer model?
 \end{lstlisting}
 
-To avoid this error, the first idea was to completely omit the use of \code{'TRANSPOSE\_CONV'} \gls{tfop} in the model, relying on a more simple \gls{tfop} combination for deconvolution:
-\code{'UpSampling2D'} + \code{'Conv2D'}, which will affect the model accuracy, but at least could yield acceptable, especially for edge device inference, results. The other idea, however,
-was given a try: the \gls{tf} version was downgraded to v2.5.0 <check if true>, which corresponds to, as mentioned in \secshortref{subsec:hardware},
-\gls{tflite} library version on \gls{devboard}. The rationale behind this decision is to try the best version compatibility combination, taking the edge device as starting point.
-After the downgrade the first successfull compilation and and inference was performed, with the results presented in \secshortref{sec:evaluation}.
+To avoid this error, the first approach was to omit the \code{TRANSPOSE\_CONV} \gls{tfop} while keeping the newest \gls{tf},
+replacing deconvolution with the simpler combination \code{UpSampling2D} + \code{Conv2D}.
+This may reduce accuracy but could still yield acceptable results for edge-device inference. Alternatively,
+the \gls{tf} version was downgraded to v2.5.0, corresponding to the \gls{tflite} library on the \gls{devboard},
+to maximize version compatibility with the target hardware. After the downgrade, the first successful compilation and inference were achieved.
+Results are presented in \secshortref{sec:evaluation}.
 
-Upon introduction of \gls{qat} annotated model layers, the \gls{tfmot} package has to be installed for it. The version used needs to be compatible with \gls{tf} version,
-which at that point was v2.5.0. This necessitated the installation of \gls{tfmot} v0.6.0. At a \gls{tflite} conversion step, during \gls{ptq} the following error keep occuring:
+With the introduction of \gls{qat} annotated model layers, the \gls{tfmot} package must be installed, with a version compatible with \gls{tf} v2.5.0.
+This required installing \gls{tfmot} v0.6.0.
+During the \gls{tflite} conversion step (while performing \gls{ptq}), the following error kept occurring:
 
 \begin{lstlisting}
-error: 'tfl.max_pool_2d' op quantization parameters violate the same scale constraint: !quant.uniform<i8:f32, 840332.86281612806:-128> vs. !quant.uniform<i8:f32, 0.027852464160498452:-127>
+error: 'tfl.max_pool_2d' op quantization parameters violate the same
+scale constraint: !quant.uniform<i8:f32, 840332.86281612806:-128>
+vs. !quant.uniform<i8:f32, 0.027852464160498452:-127>
 \end{lstlisting}
 
-\todo{improve looks}
-
-This error reffers to a \code{restriction: Input and outputs must all have same scale/zero\_point} for \code{MAX\_POOL\_2D} layer from a \gls{tflite} specification table,
-mentioned in \secshortref{subsubsec:optquant}. As part of the debugging, it was made sure, that the input and output minimum and maximum value ranges were essentially identical,
-with only mean distributions changing, what is normal for differently distributed sets of batches:
+This error refers to the \gls{tflite} restriction (see \secshortref{subsubsec:optquant}) that the inputs and outputs of \code{MAX\_POOL\_2D} must share the same scale and \code{zero\_point},
+as specified in the Quantization Specification Table\footnote{\url{https://ai.google.dev/edge/litert/models/quantization_spec}}.
+As part of debugging, it was verified that the input and output minimum and maximum ranges were essentially identical. Only the mean distributions differed,
+which is normal for batches with different compositions:
 
 \noindent
 \begin{minipage}[t]{0.48\textwidth}
@@ -734,51 +739,46 @@ with only mean distributions changing, what is normal for differently distribute
 \end{lstlisting}
 \end{minipage}
 
+Furthermore, a sanity check of the value ranges across different input batches was performed, confirming expected values from \(0\) to \(\sim 5\),
+without extreme outliers, thus, there is no justification for very large scale \(840{\,}332.8\) as indicated by the error message.
+Activation ranges of the preceding \code{Conv2D} layer were inspected in Netron and showed no anomalies.
+These findings suggest an internal issue with this specific \gls{tfmot} version, as the observed input/output statistics contradict the scale values implied by the error message.
 
-Furthermore, the sanity check of the value ranges of different input batches was performed, confirming expected values ranging from 0 to $\sim5$,
-without extremely large or small numbers as outliers, hence providing no reason for big scale values, such as \code{840332.86281612806} as can be gathered from error message.
-Activation ranges from the preceding \code{Conv2D} layer were investigated with the help of Netron, showing no conspicuousness as well.
-These investigations are suggesting the internal issue of this specific \gls{tfmot} version, as the input and output data are contradicting the error's message scale calculation.
+During debugging, it was further identified that a similar issue\footnote{\url{https://github.com/tensorflow/model-optimization/issues/1053}} had been reported for a later \gls{tfmot} version.
+Combined with the observations above, this suggested trying a newer \gls{tfmot} release in which the bug might be fixed.
+This raised concerns about compatibility with the older \gls{tf} v2.5.0 required for \gls{tflite} (\gls{tfop} v3) compatibility mentioned earlier.
+It was decided to proceed, however, given the absence of documentation explicitly stating incompatibility of newer \gls{tfmot} with older \gls{tf}.
+Multiple version combinations of these modules were evaluated.
 
-\todo{explain somewhere at the beginning the importance of Technical Challenges Chapter, saying that it is important for practical reproducibility,
-but if the reader wants pure implementation logic, theyre optional}
+Selecting a combination of newer \gls{tfmot} and \gls{tf} resolved the issue.
+This, in turn, supports the conclusion that the error originated in the \gls{tf}/\gls{tfmot} implementation and was corrected in later releases.
 
-During the debugging process was furthermore identified,
-that the similar issue was encountered even on a more later \gls{tfmot} version\footnote{\url{https://github.com/tensorflow/model-optimization/issues/1053}}.
-This information combined with own investigations led to the idea of trying newer \gls{tfmot} version, where this bug was already fixed.
-Concerns about its compatibility with the older \gls{tf} v2.5.0 were raised, since it was needed for \gls{tfop} v3 compatibility mentioned earlier.
-It was decided to prceed, however, due to the absence of documentation of version incompatibility of newer \gls{tfmot} against older \gls{tf}.
-The idea was to try multiple version combinations of these modules.
-
-Picking a combination of newer \gls{tfmot} and \gls{tf} versions resulted in resolving the issue, without making architectural changes to the model.
-This recursively confirmed the the error as internal in \gls{tf} or \gls{tfmot} implementation code, fixed in later releases.
-
-The successfull conversion to \code{.tflite} model format was subsequently achieved. This process, executed internally by new versions of \gls{tf} and \gls{tfmot},
-inserted, however, automatically the \code{Transpose} \gls{tfop} into model architecture. The \code{Transpose} \gls{tfop}, however, was used at no point in model architecting,
-indicating automated intertnal optimization of \gls{qat} annotation by \gls{tfmot}. The reasons for this are unclear,
-with assumption of necessity to transform at some point of the conversion the layer's outputs between two common shape conventions:
-\code{[batch, H, W, C] (NHWC)} and \code{[batch, C, H, W] (NCHW)}. The inability of a certain party, involved in conversion process,
-to handle either of these shapes may request the transformation,
-which is handled with \code{Transpose} \gls{tfop} inserted before \code{TransposeConv} \gls{tfop}. Below the architecture of the same model is illustrated before (left)
-and after \gls{edgetpu} compilation process (right).
+Successful conversion to the \code{.tflite} format was subsequently achieved.
+During conversion, the newer \gls{tf}/\gls{tfmot} toolchain automatically inserted a \code{Transpose} \gls{tfop} into the model.
+This operator was not used during model design, indicating an internal optimization related to \gls{qat} handling.
+A plausible explanation is the need to convert between common tensor layouts --- \code{[batch, H, W, C] (NHWC)} and \code{[batch, C, H, W] (NCHW)} --- at some point in the pipeline.
+Limitations in one component's ability to process a given layout can trigger such a transformation, implemented as a \code{Transpose} placed before \code{TransposeConv}.
+Below in \autoref{fig:transposeerror}, the same model architecture is shown before (left) and after (right) the \gls{edgetpu} compilation process.
 
 \begin{figure}[H]
   \centering
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
-    \includegraphics[height=12cm]{files/modelPartQuantEdgeTPUFail.pdf}
-    \caption{Links}
+    \includegraphics[height=11cm]{files/modelPartQuantEdgeTPUFail.pdf}
+    \caption{Before compilation}
   \end{subfigure}
   \hfill
   \begin{subfigure}[t]{0.48\textwidth}
     \centering
-    \includegraphics[height=12cm]{files/modelPartCustomEdgeTPUFail.pdf}
-    \caption{Rechts}
+    \includegraphics[height=11cm]{files/modelPartCustomEdgeTPUFail.pdf}
+    \caption{After compilation}
   \end{subfigure}
-  \caption{Zwei SVGs nebeneinander (als PDF)}
+  \caption{Inserted \code{Transpose} \gls{tfop} prevents fusion into a single \code{edgetpu-custom-op}.}
+  \label{fig:transposeerror}
 \end{figure}
 
-The crucial console output part as well as \code{.log} file are provided, indicating the failed attempt to fuse multiple \glspl{tfop} into aspired \code{edgetpu-custom-op}.
+Both the crucial console output and the \code{.log} file are provided in \autoref{lst:edgetpu_compilation1},
+indicating the failed attempt to fuse multiple \glspl{tfop} into the intended \code{edgetpu-custom-op}.
 
 \begin{lstlisting}[
   basicstyle=\ttfamily\small,
@@ -789,11 +789,10 @@ The crucial console output part as well as \code{.log} file are provided, indica
   frame=single,
   xleftmargin=0pt,
   linewidth=\textwidth,  % fill the page width
-  caption={Edge TPU compiler output for the quantized model},
+  caption={Failed mapping to \gls{edgetpu}},
   label={lst:edgetpu_compilation1},
   captionpos=b
 ]
-
 Model successfully compiled but not all operations are supported
 by the Edge TPU. A percentage of the model will instead run on the CPU,
 which is slower. If possible, consider updating your model to use only
@@ -823,18 +822,17 @@ TRANSPOSE            1             Tensor has unsupported rank
 QUANTIZE             1             Mapped to Edge TPU
 \end{lstlisting}
 
-\todo{maybe wrap it better, add or remove some info, ensure consistent style across all work}
-
-This behaviour confirms the inability of multiple model's layers to meet the requirements defined in \secshortref{subsec:hardware},
-as well as confirms the procedure of compilation process in official documentation\footnote{\url{https://coral.ai/docs/edgetpu/models-intro/\#compiling}}.
-That states that the compiler will stop at a first unsopported by \gls{edgetpu} operation and delegate all subsequent operations for \gls{cpu} execution,
-even if after unsopported \gls{tfop} come the supported for \gls{edgetpu} execution operations. This behaviour is represented on the image below.
+This behaviour confirms that multiple layers of the model do not meet the requirements defined in \secshortref{subsec:hardware},
+and it is consistent with the compilation procedure described in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/models-intro/\#compiling}}.
+Specifically, the compiler stops at the first operation not supported by the \gls{edgetpu} and maps all subsequent operations to the \gls{cpu},
+even if some of those later operations would otherwise be supported on the \gls{edgetpu}.
+This behaviour is illustrated below in \autoref{fig:compileSeqEdgeTPU}.
 
 \begin{figure}[htbp]
   \centering
   % Choose either a width OR a height, or both with keepaspectratio.
   % Example A: set width only (aspect ratio preserved automatically)
-  \includegraphics[width=0.7\linewidth]{files/compileSequenceEdgeTPU.png}
+  \includegraphics[width=0.8\linewidth]{files/compileSequenceEdgeTPU.png}
 
   % Example B (recommended): limit both max width & height, keep aspect ratio
   %\includegraphics[
@@ -843,33 +841,31 @@ even if after unsopported \gls{tfop} come the supported for \gls{edgetpu} execut
   %  keepaspectratio
   %]{images/example.png}
 
-  \caption{Descriptive caption for the image (what the figure shows).}
+  \caption{The compiler creates a single custom op for all \gls{edgetpu} compatible ops, until it encounters an unsupported op; the rest stays the same and runs on the \gls{cpu}}
   \label{fig:compileSeqEdgeTPU}
 \end{figure}
 
-The delegation of tensor operations to \gls{cpu} will almost certainly drastically increase the inference time,
-which is inappropriate in the scope of the work, aspiring to map the entire model on \gls{edgetpu}.
+Delegation of tensor operations to the \gls{cpu} will almost certainly increase inference time drastically, which is inappropriate here,
+as the goal is to map the entire model to the \gls{edgetpu}.
 
-As the process of \code{Transpose} \gls{tfop} insertion is happening completely internally and automatically,
-there is no possibility to affect this or to explicitly set the layer's parameters to be constant at compile-time and of shape <3, as required by \gls{edgetpu} Compiler.
+Because insertion of the \code{Transpose} \gls{tfop} occurs entirely internally and automatically,
+there is no practical way to influence it or to enforce layer parameters to be constant at compile time and of shape \(<3\), as required by the \gls{edgetpu} Compiler.
 
-There are again two ideas could be realised. Avoid the use of \code{TransposeConv} or to continue the search for compatible \gls{tf} and \gls{tfmot} versions.
-By choosing the second idea, the one is caught between a rock and a hard place. On the one hand the \gls{tf} version has to be kept as low as possible for the best compatibility with
-\gls{tflite} on the edge device and to avoid encountering the \code{TRANSPOSE\_CONV version 4} compiler error, described earlier. On the other hand the version of \gls{tf} and \gls{tfmot}
-has to be high enough to contain the fixed bug of scale incompatibility, encountered earlier. With this in mind, the following approach was chosen: find the highest \gls{tf} version,
-which is still utilizing the v3 of \code{TransposeConv} \gls{tfop}. This approach, however is highly relying on the assumption, that all other newer \glspl{tfop},
-probably introduced in newer \gls{tf} version, will not encounter compiling problems, as well as be compatible with the older \gls{tflite} v2.5.0 on an inference device.
-Because essentially, if the \gls{edgetpu} Compiler successfully fuses every \gls{tfop} into \code{edgetpu-custom-op},
-the \gls{tflite} runtime v2.5.0 is required to only be able to parse and load the model until it is delegated over to \gls{edgetpu}.
-So in this case, it is more relied on the compiler as the last instance to check the general compatibility before running inference.
-Hence the certain compatibility unsureness is still existing, which presence has to be considered when using new (possibly custom) layer types.
-But in the scope of this work to achieve the objective this assumption is deemed as sufficient.
+Two options were considered: (i) avoid \code{TransposeConv} altogether, or (ii) continue searching for compatible \gls{tf} and \gls{tfmot} versions.
+Pursuing the second option places one between a rock and a hard place:
+the \gls{tf} version should be kept as low as possible to maintain compatibility with the device \gls{tflite} runtime and
+to avoid the previously observed \code{TRANSPOSE\_CONV} version 4 compiler error, yet sufficiently high to include the bug fix for the scale incompatibility encountered earlier.
+Accordingly, the following approach was adopted: identify the highest \gls{tf} release that still uses \code{TransposeConv} version 3.
+This approach assumes that any newer \glspl{tfop} introduced in later \gls{tf} versions neither cause compilation issues nor conflict with the older \gls{tflite} v2.5.0 on the inference device.
+In effect, if the \gls{edgetpu} Compiler successfully fuses all \glspl{tfop} into a single \code{edgetpu-custom-op},
+the \gls{tflite} runtime v2.5.0 only needs to parse and load the model before delegation to the \gls{edgetpu}.
+Some compatibility uncertainty therefore remains, especially for newer (or custom) layer types, but for the purposes of this work, this assumption is considered sufficient.
 
-Given the absence of the official documentation about such detailed information of \glspl{tfop},
-the search for the compatible \code{TransposeConv} \gls{tfop} was only possible by investigating the contents of \code{register.cc} file,
-located in \gls{tf} repository in the folder \code{tensorflow/tensorflow/lite/kernels}. It is important to mention,
-that in different \gls{tf} versions this file can be present in a slightly different folders, but in a close vicinity to the provided path.
-The newest \gls{tf} version with a \code{TransposeConv} v3 is found out to be v2.10.0. The corresponding lines of \code{register.cc} are:
+In the absence of official documentation at the required level of detail for individual \glspl{tfop},
+the compatible \code{TransposeConv} version was identified by inspecting the \code{register.cc} file in
+the \gls{tf} repository under \code{tensorflow/tensorflow/lite/kernels} (noting that its exact location may vary slightly by version).
+The newest \gls{tf} version found to register \code{TransposeConv} v3 was v2.10.0.
+The corresponding \code{register.cc} lines are:
 
 \begin{lstlisting}
 AddBuiltin(BuiltinOperator_TRANSPOSE_CONV, Register_TRANSPOSE_CONV(),
@@ -877,51 +873,44 @@ AddBuiltin(BuiltinOperator_TRANSPOSE_CONV, Register_TRANSPOSE_CONV(),
            /* max_version = */ 3);
 \end{lstlisting}
 
-It turned out, that the newest \gls{tfmot} v0.8.0 is backward compatible with \gls{tf} v2.10.0, despite being tested against \gls{tf} 2.14.1,
-as can be confirmed on official releases page\footnote{\url{https://github.com/tensorflow/model-optimization/releases}}.
+It was found that the latest \gls{tfmot} v0.8.0 is backward compatible with \gls{tf} v2.10.0,
+despite being tested against \gls{tf} v2.14.1, as noted on the official releases page\footnote{\url{https://github.com/tensorflow/model-optimization/releases}}.
 
-The problem of such version incompatibilities is presumably stemming from introducing the newer version of \code{libedgetpu} runtime library,
-while keeping the old \gls{tflite} version on a \gls{devboard}, without providing an official possibility to upgrade and even out the versions.
-This, as proven here, could be misleading and confusing when the one faced with the choice of inter-compatibility of multiple required packages.
-Especially when newer improved versions of some of these packages have become available in the meantime.
+The observed version incompatibilities presumably stem from introducing a newer \code{libedgetpu} runtime while retaining an older \gls{tflite} on the \gls{devboard},
+without an official upgrade path to align versions. As demonstrated here, this can be misleading when selecting inter-compatible packages, especially when newer releases become available.
 
-At the end, the version combination \gls{tf} v2.10.0 and \gls{tfmot} v0.8.0 resolved all previous errors and led to successfull compilation of model,
-fully mapping all \glspl{tfop} to \gls{edgetpu}, as it is presented in <ref image here!>.
-This setup was subsequently used later on during the full process of the pipeline utilization in the scope of this work.
-
-\todo{requirements mention somewhere}
+Ultimately, the combination of \gls{tf} v2.10.0 and \gls{tfmot} v0.8.0 resolved the earlier errors and enabled successful compilation,
+fully mapping all \glspl{tfop} to the \gls{edgetpu}, as shown in \autoref{fig:successcompile}. This setup was used thereafter throughout the pipeline.
 
 \section{Deployment}
 \label{sec:deployment}
 
-After training, conversion and compilation processes the \code{.tflite} model is deployed on \gls{edgetpu} to run inference.
+After training, conversion, and compilation, the \code{.tflite} model is deployed on the \gls{edgetpu} to run inference.
 
-At early development stage the most convenient deployment way with the help of python utilities was applied.
-Provided by Google these libraries wrap all necessary boilerplate into a small amount of functions with a purpose to conveniently load the model into \gls{edgetpu},
-pass the input tensor to it and collect the output tensor. A simplified example of full inference in python code is presented below for understanding the simplicity of
-operating \gls{edgetpu} with provided heplers.
+At early stages of development, deployment was most conveniently performed using Python utilities.
+Provided by Google, these libraries encapsulate the necessary boilerplate into a small set of functions to load the model onto the \gls{edgetpu},
+pass the input tensor, and retrieve the output tensor.
+A simplified Python example is presented below to illustrate the ease of operating the \gls{edgetpu} with the provided helpers.
 
-%\begin{minted}{python}
-%from pycoral.utils.edgetpu import make_interpreter
-%from pycoral.adapters import common
-%
-%# Load model
-%interpreter = make_interpreter(model_path)
-%interpreter.allocate_tensors()
-%
-%# Prepare input
-%common.set_input(interpreter, input_tensor)
-%
-%# Inference
-%interpreter.invoke()
-%
-%# Output
-%output = common.output_tensor(interpreter, 0)
-%\end{minted}
+\begin{minted}{python}
+from pycoral.utils.edgetpu import make_interpreter
+from pycoral.adapters import common
 
-\todo{ENABLE Minted}
+# Load model
+interpreter = make_interpreter(model_path)
+interpreter.allocate_tensors()
 
-Utilizing the provided python modules the first inference results were obtained, they are presented along with the corresponding ground truth on the image below.
+# Prepare input
+common.set_input(interpreter, input_tensor)
+
+# Inference
+interpreter.invoke()
+
+# Output
+output = common.output_tensor(interpreter, 0)
+\end{minted}
+
+Using the provided Python modules, the first inference results were obtained and are shown alongside the corresponding \gls{gt} in \autoref{fig:firstinferenceresult}.
 
 \begin{figure}[htbp]
     \centering
@@ -929,43 +918,37 @@ Utilizing the provided python modules the first inference results were obtained,
     \begin{subfigure}{0.45\textwidth}
         \centering
         \includegraphics[height=5cm]{files/FIRSTInferenceResult.png}
-        \caption{First image}
+        \caption{Predicted cloud mask}
     \end{subfigure}
     \hfill
     % Second image
     \begin{subfigure}{0.45\textwidth}
         \centering
         \includegraphics[height=5cm]{files/FIRSTInferenceResultGT.png}
-        \caption{Second image}
+        \caption{Corresponding \gls{gt}}
     \end{subfigure}
-    \caption{Two images side by side}
-    \label{fig:two-images}
+    \caption{First \gls{edgetpu} inference results}
+    \label{fig:firstinferenceresult}
 \end{figure}
 
-This single patch inference initial results became a milestone of this work and laid the foundation for the subsequent inference pipeline.
+These initial single-patch inference results marked a milestone in this work and laid the foundation for the subsequent inference pipeline.
 
-To simplify the operation of \gls{edgetpu} hardware so much, developers are providing two python libraries\footnote{\url{https://coral.ai/docs/edgetpu/tflite-python/}}:
-PyCoral \gls{api} and \gls{tflite} \gls{api}, where PyCoral wraps the \gls{tflite} repetitive functions needed for inference into even simplier ones, as shown on the image above <REF>.
+To simplify operation of the \gls{edgetpu} hardware, two Python libraries are provided\footnote{\url{https://coral.ai/docs/edgetpu/tflite-python/}}:
+the PyCoral \gls{api} and the \gls{tflite} \gls{api}, with PyCoral wrapping repetitive \gls{tflite} inference steps into simpler helpers.
 
-After successfull implementation of a single patch inference in python, it was decided to expand it into the full scene inference pipeline using C++.
-The main rationale behind it lies in the extended control over inference process and its potential acceleration.
-Furthermore python overhead functions to, for instance, read the \code{.TIF} images directly,
-transform them and pass to \gls{edgetpu} in one go yields on one side teh convenience of implementing the complete pipeline inside one script.
-On the other side, however, may lead to slowed process unwanted on embedded system inference. This logic applies to other necessary operations,
-that potentially had to be performed in python. More common approach for embedded systems has to be utilized, transforming the input data
-potentionally on other device, perform inference on edge device, transform output data on other device.
-Additionall factor that led to implementation of C++ inference was the specific error,
-encountered at the end of each and every Python inference. It was believed at the time,
-that more control over inference sequence with the help of C++ functions will shed light on and help to get rid of that error.
-More specific about it in \secshortref{subsec:tecchallDeployment}.
+After successful implementation of single-patch inference in Python, expansion to a full-scene inference pipeline in C++ was pursued.
+The main rationale was increased control over the inference process and potential acceleration.
+Python helper functions can conveniently read \code{.TIF} images, transform them, and pass tensors to the \gls{edgetpu} in a single script.
+However, this convenience may introduce overhead that is undesirable on an embedded system.
+A more typical embedded approach was therefore adopted: transform input data on another device, perform inference on the edge device, and post-process outputs elsewhere.
+An additional factor was a specific error encountered at the end of each Python inference.
+Greater control over the inference sequence via C++ was expected to clarify and eliminate this issue (see \secshortref{subsec:tecchallDeployment}).
 
-The \gls{devboard} Mendel Linux OS contains from installation almost every library needed for operating its \gls{edgetpu} module.
-That holds true for Python libraries, such as PyCoral and \gls{tflite} \glspl{api}, as well as for hardware runtime library \code{libedgetpu}.
-The essential \gls{tflite} C++ \gls{api} library is not included, though.
-It is furthermore impossible to cross use the \gls{tflite} \gls{api} for Python by C++,
-since the binary is compiled specifically for Python and in fact lacks the header files for C++.
-On a chart below the general flow of running the model on \gls{edgetpu} on \gls{devboard} is represented,
-highlighting the difference between inference implementation in Python and C++.
+The \gls{devboard}'s Mendel Linux includes, by default, most libraries needed to operate the \gls{edgetpu} module:
+the PyCoral and \gls{tflite} Python \glspl{api}, as well as the \code{libedgetpu} runtime.
+The essential \gls{tflite} C++ \gls{api} is not included, however.
+Moreover, the \gls{tflite} Python package cannot be reused from C++, as its binary targets Python and does not provide C++ headers.
+\autoref{fig:runflow} summarizes the flow of running the model on the \gls{edgetpu} on the \gls{devboard}, highlighting the differences between Python and C++ based inference.
 
 \begin{figure}[H]
 \centering
@@ -1000,162 +983,152 @@ highlighting the difference between inference implementation in Python and C++.
 
 \end{tikzpicture}%
 }
-\caption{ADJUST}
+\caption{Running the model on \gls{edgetpu} with Python and C++}
+\label{fig:runflow}
 \end{figure}
 
-Since no pre-build \gls{tflite} C++ \gls{api} libraries can be found for \gls{devboard}, it had to be build from source.
+Since no prebuilt \gls{tflite} C++ \gls{api} libraries were available for the \gls{devboard}, it had to be built from source.
 The process is described in detail in \secshortref{subsec:tecchallDeployment}
-and marks the third and the last technical implementation challenge milestone in the scope of this work.
+and marks the third and final technical implementation challenge in this work.
 
-After successfully incorporating the \gls{tflite} C++ \gls{api} library on \gls{devboard},
-it was utilized to implement the first C++ inference inside the \code{inference.cpp} file. Following the success,
-the folder reading feature was implemented on C++ to process multiple patches in a row.
-These patches had to be stored as \code{.bin} files with known shape and type (\gls{float32}) of the data inside.
-After inference the program writes output \code{.bin} files with predicted cloud masks in \gls{float32} format.
-Quantization parameters of input and output are retrieved from model during the inference and used for quantized transformation of input and dequantization of the output tensor.
-Later on, the stitching process was C++ implemented too.
-By running the \code{stitch.cpp} file all \code{.bin} patches inside the input folder are gapless stitched into a single \code{.bim} scene.
-This \code{.bin} scene can be then converted to \code{.png} file for visual inspection.
-It is implemented to optionally be performed on \gls{devboard} with the help of Python script \code{convert.py}.
-\todo{check all filenames}
-It has to be mentioned, that for the sake of convenience the whole inference, stitching and conversion process could have been implemented as a single C++ executable.
-It was kept, however, separate due to two reasons. Firstly allowing more fexibility and less overhead for later potentially performance critical implementation on the satellite.
-Secondly, the persisting error, described in \secshortref{subsec:tecchallDeployment}, is not allowing to run any code immediately after inference process is done.
+After successfully incorporating the \gls{tflite} C++ \gls{api} on the \gls{devboard},
+it was used to implement the first C++ inference in \code{inference.cpp}.
+Following this, a folder-reading utility was implemented in C++ to process multiple patches sequentially.
+These patches are stored as \code{.bin} files with known shape and data type (\gls{float32}).
+After inference, the program writes \code{.bin} outputs containing the predicted cloud masks in \gls{float32}.
+Quantization parameters for the input and output are retrieved from the model at runtime and used to quantize the input tensor and dequantize the output tensor.
+Later, the stitching process was also implemented in C++.
+By running \code{stitch.cpp}, all \code{.bin} patches in the input folder are stitched into a single \code{.bin} scene without gaps.
+This \code{.bin} scene can then be converted to a \code{.png} for visual inspection.
+This conversion can optionally be performed on the \gls{devboard} using the Python script \code{convert.py}.
 
-As final steps, concluding the inference implementation on \gls{devboard} were following improvements.
-The SDCard with prepared \code{.bin} patches for each scene on it, is mounted on a \gls{devboard}. This allows to host the entire dataset of several GBs of size,
-which would be impossible to do an a \gls{devboard}.
-The stitching and conversion processes were unified under a single executable, with Pyhton function call for conversion after C++ \code{.bin} stitching.
-During both inference and stitch-conversion pracesses the user is promted to pick one out of 20 test scenes for inference and/or conversion.
-Furthermore, the Python process of conversion to \code{.png} is improved by eliminating the big output array being loaded in \gls{devboard}'s RAM memory,
-by handling it in chunks, therefore enabling to convert bigger full resolution scenes.
+Note that the entire inference, stitching, and conversion pipeline could have been consolidated into a single C++ executable.
+It was intentionally kept separate for two reasons:
+(i) to allow greater flexibility and lower overhead for a future performance-critical satellite implementation, and
+(ii) because the persistent error described in \secshortref{subsec:tecchallDeployment} prevents running any code immediately after the inference step.
 
-The final version of inference, stitching and conversion implementation on a \gls{devboard} can be found in \code{git} under the tag \code{Deployment\_v1.0}.
+As final steps concluding the inference implementation on the \gls{devboard}, the following improvements were made.
+An SD card containing prepared \code{.bin} patches for each scene is mounted on the \gls{devboard},
+allowing the entire dataset (several~GB) to be hosted, otherwise infeasible on the \gls{devboard}'s internal storage.
+The stitching and conversion processes were unified under a single executable: after C++ \code{.bin} stitching, a Python function is invoked to perform the conversion.
+During both inference and stitch-conversion processes, the user is prompted to select one of the 20 test scenes for inference and/or conversion.
+Furthermore, the Python \code{.png} conversion was improved by avoiding loading the entire output array into the \gls{devboard}'s \gls{ram}.
+Instead, chunked processing is used, enabling conversion of larger full resolution scenes.
 
 \subsection*{Technical Challenges}
 \label{subsec:tecchallDeployment}
 
-The last significant implementation milestone in the scope of this work was to build the \gls{tflite} C++ \gls{api} library for the \gls{devboard} from source.
-As can be seen on the chart <REF>, this library is crucial for implementation of pure C++ inference.
+The final significant implementation milestone in this work was building the \gls{tflite} C++ \gls{api} library for the \gls{devboard} from source.
+As shown in \autoref{fig:runflow}, this library is crucial for implementing pure C++ inference.
 
-A guidance to carry out this task is very sparsely mentioned in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/tflite-cpp/\#build-your-project-with-libedgetpu}}.
-Taking these recommendations into account it was clear, that the compatible version of \gls{tf} to a pre-installed on \gls{devboard} \code{libedgetpu} library had to be determined.
-The version of installed \code{libedgetpu} was determined quickly as v16.0. But on the official releases website\footnote{\url{https://github.com/google-coral/libedgetpu/releases}},
-can be found no mention of numerical verison convention, so the literal date when the symlink \code{libedgetpu.so.1} was modified was used to approximately determine the release version.
-On the particular \gls{devboard} used in this work it was the 09.07.2021,
-predating the official "Grouper" \code{libedgetpu} release\footnote{\url{https://github.com/google-coral/libedgetpu/tree/release-grouper}} on 26.07.2021 by two weeks.
-Hence from the \code{workspace.bzl} of this exact release the exact \gls{tf} commit corresponding to the \gls{tf} release 2.5.0 as of 05.07.2021 was determined.
+Guidance for this task is only sparsely mentioned in the official documentation\footnote{\url{https://coral.ai/docs/edgetpu/tflite-cpp/\#build-your-project-with-libedgetpu}}.
+Taking those notes into account, a compatible \gls{tflite} version for the \code{libedgetpu} runtime preinstalled on the \gls{devboard} had to be determined.
+The installed \code{libedgetpu} was identified as v16.0. However, the releases page\footnote{\url{https://github.com/google-coral/libedgetpu/releases}}
+does not use a consistent numeric versioning convention, so the modification date of the \code{libedgetpu.so.1} symlink was used to approximate the release.
+On the \gls{devboard} used here this date was 09.07.2021,
+which predates the official “Grouper” \code{libedgetpu} release\footnote{\url{https://github.com/google-coral/libedgetpu/tree/release-grouper}} (26.07.2021) by two weeks.
+From that release's \code{workspace.bzl}, the exact \gls{tf} commit corresponding to \gls{tf}~2.5.0 (05.07.2021) was identified.
 
-First build try was performed on a Windows machine, cross-compiling for \code{aarch64} Linux. After successfull compilation the wall was hit during the first inference test,
-where it was run into low level incompatibility with \gls{devboard}'s atomic instructions. It became clear, that the library has to be build either by using Bazel with predefinition
-of full \gls{devboard} configuration or directly on the \gls{devboard}. It was made a decision to stick with the second option. In order to do it, the SDCard was used to host large
-\gls{tf} folder (of the specific v2.5.0 commit) and additionally provide RAM swap space, due to concerns,
-that \gls{devboard} will run out of RAM memory during compilation process. It is important to mention,
-that building was performed using the latest by the time of the work portable version of \code{CMake}. 
+The first build attempt was performed on a Windows machine via cross-compilation for \code{aarch64} Linux.
+Although compilation succeeded, the first inference test failed due to low-level incompatibilities with the \gls{devboard}'s atomic instructions.
+It was therefore concluded that the library must be built either with Bazel using a full \gls{devboard} configuration or directly on the device.
+The latter was chosen. An SD card was used to host the large \gls{tf} source tree (specific v2.5.0 commit) and to provide swap space,
+to avoid running out of \gls{ram} during compilation. The build was performed using the then-latest portable \code{CMake}.
 
-After successfully building the static \code{libtensorflow-lite.a} library, several additional necessary steps had to be performed and files gathered.
-The unavoidable \code{edgetpu.h} header has to be downloaded\footnote{\url{https://github.com/google-coral/libedgetpu/blob/master/tflite/public/edgetpu.h}},
-together with a compatible with the given build FlatBuffers library v1.12.0. Additionally every \gls{tflite} required static library had to be included.
-The necessary include files are provided in git and can also be investigated in \code{MAKEFILE}.
+After successfully building the static library \code{libtensorflow-lite.a}, several additional steps were required.
+The \code{edgetpu.h} header\footnote{\url{https://github.com/google-coral/libedgetpu/blob/master/tflite/public/edgetpu.h}} and a FlatBuffers library (v1.12.0) compatible with the build were obtained,
+and all required \gls{tflite} static libraries were included.
+The necessary include paths and libraries are recorded in the repository and can also be reviewed in the \code{MAKEFILE}.
 
-After all compilator and linker issues were resolved and requirements satisfied, the successfull model loading and tensor allocation using C++ \gls{api}
-marked the last technical milestone of this work.
+Once compiler and linker issues were resolved and all requirements satisfied, successful model loading and tensor allocation using the C++ \gls{api}
+marked the final technical milestone of this work.
 
-\subsubsection*{Unresolved error}
+\subsubsection*{Open Issue}
 
-In the scope of this work and regarding to the specific \gls{devboard} with its specific installed Mendel Linux OS and the modules an interesting
-behaviour after inference could not remain unnoticed.
-From the early development stages and up to the final improvements of C++ inference in the scope of this thesis, one of the two following errors persistendly
-kept appearing always after (!) the inference was completed: "Segmentation fault" or "Bus error". First it was encountered during the simple proof-of-concept
-Python inference, at the end of the program, after successfully saved inference results. Being disasterous for a programmer by its nature,
-but strangely appearing at program's closing, these errors had no effect on obtaining the required inference results. Clearly stemming from C++ background code
-and thus providing no way for debugging them in Python, these errors allowed further development of pipeline having no effect on the required results.
-The idea of C++ inference implementation was, however, further fueled by the desire to get rid of these errors. It was assumed,
-that more low-level C++ implementation could shine the light on them. But it was found out, that even after successfully obtaining first results with pure C++ inference,
-these errors kept their alternating appearence at the \code{main()} program's exit. During the debugging process it was established,
-that these errors indeed come from \code{libedgetpu} library, presumably during cleanup routine after the inference is completed. There was, however,
-no possibility to trace the exact line of code causing these errors, since provided \code{libedgetpu} library was build without debugging information.
-In order to trace these errors the library would have to be rebuild with the necessary debugging information included. This potentially encompasses difficuilties
-with broken dependencies and other corresponding to the custom low-level library installation difficuilties.
-This is certainly a very interesting and worthwhile investigative error, but it lies beyond the scope of this thesis.
-It is assumed, that the error was fixed in later \code{libedgetpu} releases\footnote{\url{https://github.com/tensorflow/tensorflow/issues/62371}},
-but with no official way to update the library on the given device the dive into custom build would have been inevitable.
+In the scope of this work, and with regard to the specific \gls{devboard} with its installed Mendel Linux OS and modules, an unusual behaviour after inference was observed.
+From early development through the final C++ inference improvements, one of two errors persistently appeared only after the inference had completed:
+\code{Segmentation fault} or \code{Bus error}.
+The phenomenon was first encountered during the simple proof-of-concept Python inference, at program termination after results had been successfully saved.
+Although such errors are typically disastrous, their occurrence at shutdown had no effect on obtaining the required inference outputs.
+As they clearly originated in C++ backend code, debugging from Python was not feasible; nonetheless, pipeline development proceeded unaffected.
 
-It was decided to continue the work, since these error had no effects on performance and results.
-It is possible to run multiple \code{Interpreter} invokations to process folders of files.
-It is, however, not possible to run any code after fully completed inference, since the program is crashing at exit.
-Therefore stitching and conversion processes had to be done as separate programs.
+The move to a pure C++ inference was motivated in part by the desire to eliminate these errors.
+However, even after the first successful C++ results, the errors continued to alternate upon exiting \code{main()} in \code{inference.cpp}.
+During debugging, the source was narrowed down to the \code{libedgetpu} library --- presumably during its cleanup routine after inference.
+Exact lines could not be traced, as the provided \code{libedgetpu} was built without debugging symbols.
+Diagnosing this would require rebuilding the library with debug information, a process likely to entail dependency issues and other challenges typical of custom low-level builds.
+This appears to be a worthwhile line of investigation but lies beyond the scope of this thesis.
+It is presumed that the issue was fixed in later \code{libedgetpu} releases\footnote{\url{https://github.com/tensorflow/tensorflow/issues/62371}},
+but without an official upgrade path on the device, a custom rebuild would have been inevitable.
 
-\section{Evaluation}
+Work was therefore continued, as the errors had no impact on performance or results.
+Multiple \code{Interpreter} invocations can be executed to process folders of files. However, no code can be run after inference completes, because the program crashes at exit.
+Consequently, the stitching and conversion stages were implemented as separate programs.
+
+\section{Evaluation Pipeline}
 \label{sec:evaluation}
 
-With the implementation of deployment pipeline on \gls{devboard}, the cloud prediction masks can be finally obtained.
-They are visually verified by the human observer, qualitatively marking the success of implementation and achieving the thesis' goal.
-Furthermore the quantitative performance metric was implemented in \code{inference.cpp} on \gls{devboard} to determine the inference time per precossed patch.
-By summing up the inference time, the model's inference time for the whole scene is obtained.
+With the implementation of the deployment pipeline on the \gls{devboard}, cloud prediction masks can be obtained.
+Visual inspection by a human observer is used to qualitatively confirm successful implementation and attainment of the thesis objective.
+Furthermore, a quantitative performance metric was implemented in \code{inference.cpp} on the \gls{devboard} to determine the inference time per processed patch;
+by summing these times, the model's per-scene inference time is obtained.
 
-The flexibility of training and deployment pipelines allow convenient modular improvement and feature expansion.
-It can be tailored to the needs and requirements of model's development, intended to be deployed immediately on the satellite.
-For this task additional model's performance quantitative evaluation is necessary.
-It will ultimately be used in \secshortref{chapter:evaluation}, where the performance of several \gls{edgetpu} optimized models will be asessed.
+The flexibility of the training and deployment pipelines allows convenient, modular improvement and feature expansion.
+They can be tailored to the needs and requirements of model development intended for immediate satellite deployment.
+For this, additional quantitative evaluation of model performance is necessary. The results are ultimately used in \secshortref{chapter:evaluation},
+where the performance of several \gls{edgetpu} optimized models is assessed.
 
-The evaluation pipeline is designed as an additional segment after the training pipeline. It is designed to run on a machine used for training, not on \gls{devboard}.
+The evaluation pipeline is implemented as an additional stage following the training pipeline and is run on the training machine, not on the \gls{devboard}.
 The evaluation pipeline consists of two parts: inference and evaluation.
 
 \subsection*{Inference}
 
-The necessary functions to perform inference and to save the results are implemented in \code{inference.py} and \code{inferenceQ.py} files.
-\code{inferenceQ.py} utilizes \gls{tflite} Interpreter and the corresponding fully \gls{int8} quantized \code{.tflite} model to perform inference,
-while \code{inference.py} operates with \gls{tf} utilities and uses \code{.h5} saved model format.
-It was noticed, that performing quantized model inference on a \gls{cpu} results in significantly slower inference time compared to \code{.h5} \gls{float32} model.
-This slows down the evaluation process. It was furthermore noticed,
-that execution of quantized model on a general use \gls{cpu} <specify CPU and mention that it was even slower!!!> yields similar inference time
-compared to deploying the quantized model on a dedicated \gls{edgetpu}. This inherently epmphasizes the sophistication of a \gls{tpu} to perform
-this type of operations compared to much more powerful for general tasks \gls{cpu}. These findings resulted in omiting the quantized inference during the evaluation process.
-\code{inference.py} is therefore used for the rest of the evaluation.
+The necessary functions to perform inference and save results are implemented in the files \code{inference.py} and \code{inferenceQ.py}.
+\code{inferenceQ.py} uses the \gls{tflite} \code{Interpreter} with the fully \gls{int8} quantized \code{.tflite} model,
+whereas \code{inference.py} relies on \gls{tf} utilities and loads the \code{.h5} saved-model format.
+It was observed that running the quantized model on a \gls{cpu} results in significantly slower inference than the \gls{float32} \code{.h5} model, which slows down the evaluation.
+Moreover, executing the quantized model on a general-purpose \gls{cpu} Intel Core i5-13400F yielded inference times even slower than deployment on the dedicated \gls{edgetpu}.
+This inherently emphasizes the sophistication of the \gls{tpu} in performing these operations, compared to a general-purpose \gls{cpu} that is otherwise more powerful for general tasks.
+Consequently, quantized inference was omitted during evaluation, and \code{inference.py} is used for the remainder.
 
-Firstly, the \code{buildDS} function feature is used to construct the testing dataset.
-As mentioned in \secshortref{subsec:testing},
-the pre-builded \code{.csv} files are used to construct the dataset either for evaluation of a single scene (specified by its ID or left to be chosen randomly),
-or for the full test dataset. In the later improved versions of \code{inference.py} the inference of full dataset is handled internally scenewise,
-achieving reduced RAM memory usage and preventing crashes. Adherently has to be mentioned, that the \code{fullTestDS.csv} is not being used at all due to this improvement.
-Then the path to the desired \code{run} folder is specified, where the model files (\code{.h5} and \code{.tflite}) are located.
-In \code{inference.py} the \code{.h5} model is loaded. Additional custom \gls{tf} objects are specified as needed for model loading,
-such as, for instance, \code{softJaccardLoss} or \code{diceCoefficient}.
-If the model predictions are provided in reduced resolution (e.g. as \ensuremath{192\times192} patches),
-the predictions are upsampled to full \ensuremath{384\times384} resolution with the intention to later match full scene \glspl{gt} during evaluation.
-The upsampling is performed using the \code{bilinear} method,
-which suits best for continuous probability distribution prediction masks <mention paper or section with explanation>.
+First, the \code{buildDS} function is used to construct the testing dataset.
+As mentioned in \secshortref{subsec:testing}, prebuilt \code{.csv} files are used to assemble either a single-scene dataset (specified by ID or chosen at random) or the full test set.
+In later versions of \code{inference.py}, full-dataset inference is handled internally on a scene-wise basis, reducing \gls{ram} usage and preventing crashes.
+Accordingly, \code{fullTestDS.csv} is no longer used.
+Next, the path to the desired \code{run} folder (containing the \code{.h5} and \code{.tflite} files) is specified.
+In \code{inference.py} the \code{.h5} model is loaded, providing any required custom \gls{tf} objects (e.g., \code{softJaccardLoss}, \code{diceCoefficient}).
 
-Finally, the infernce results are saved per scene in \code{.npy} files to be used in evaluation process.
-Optionally the masks can be saved as \code{.png} files for visual inspection.
+If model predictions are produced at reduced resolution (e.g., \(\,192\times192\,\) patches),
+they are upsampled to the full \(\,384\times384\,\) resolution to match full-scene \glspl{gt} during evaluation.
+Upsampling is performed with \code{bilinear} interpolation (see also \secshortref{sec:data}),
+which is appropriate for continuous probability maps.
+
+Finally, the inference results are saved per scene as \code{.npy} files for use in the evaluation process.
+Optionally, masks can also be saved as \code{.png} files for visual inspection.
 
 \subsection*{Evaluation}
 
-After obtaining inference results for the complete testing set (20 scenes), they have to be quantified with evaluation metrics.
-These metrics, defined in \secshortref{subsec:evalmetrics}, are implemented in \code{evaluate.py} file.
-By specifiying the \code{run} folder, containing subfolders \code{evaluation/inference},
-the algorithm searches and processes every scene's corresponding \code{.npy} file generated there by inference process.
+After obtaining inference results for the complete test set (20 scenes), they are quantified using the evaluation metrics defined in \secshortref{subsec:evalmetrics},
+as implemented in \code{evaluate.py} file.
+By specifying the \code{run} folder, that contains the \code{evaluation/inference} subfolder,
+the algorithm locates and processes each scene's \code{.npy} file produced by the inference step.
 
-As mentioned in \secshortref{subsec:dataset}, the test input scenes were cropped and padded to match \ensuremath{384\times384} patch format.
-This process additionally introduced the artificial size increase of border patches in the process. In order to match back the scene size of \gls{gt} masks,
-zero-padding at the borders has to be removed.
-This is performed by applying the center-cropping on the prediction masks and is implemented in the helper function \code{unpadToMatch}.
-This is done in the same way as it was performed in the original, dataset making papers \cite{CloudNet2019, CloudDet2018} by analyzing their \code{unzeropad}
-function, used in evaluation process\footnote{\url{https://github.com/SorourMo/38-Cloud-A-Cloud-Segmentation-Dataset/blob/master/evaluation/evaluation.m}}.
+As mentioned in \secshortref{subsec:dataset}, the test input scenes were cropped and padded to fit the \(\,384\times384\,\) patch format.
+This introduces zero padding at the scene borders. To restore the original scene size of the \gls{gt} masks, the border padding must be removed.
+This is performed by center-cropping the prediction masks via the helper function \code{unpadToMatch},
+following the procedure used in the original dataset papers \cite{CloudNet2019, CloudDet2018} (cf. their \code{unzeropad} routine used
+for evaluation\footnote{\url{https://github.com/SorourMo/38-Cloud-A-Cloud-Segmentation-Dataset/blob/master/evaluation/evaluation.m}}).
 
-Next, the evaluation pipeline provides two ways of definition of a threshold to binarize the predicted masks.
-Either the best threshold, calculated using the validation dataset, can be applied; or the best threshold can be defined for each test scene,
-ultimately utilizing the test dataset \gls{gt} masks. The effects from this will be discussed in \secshortref{chapter:evaluation}.
-This feature is implemented by passing the optional argument \code{fixedThreshold} in the evaluation function \code{evaluateAll}.
-\todo{mention threshold searching feature in training pipeline, mention evaluatePRC function there and link its usage in here too, so I dont need to mention it here}
+Next, the evaluation pipeline offers two ways to choose the threshold (see \secshortref{subsec:evalmetrics}) for binarizing the predicted masks:
+(i) apply the best threshold estimated on the validation set, or
+(ii) determine the best threshold per test scene using its \gls{gt} mask.
+The effects of these choices are discussed in the next \secshortref{chapter:evaluation}.
+This functionality is controlled via the optional \code{fixedThreshold} argument to \code{evaluateAll} function.
 
-As final step the prediction masks are binarized and evaluation performed using \code{computeMetrics} function.
-The final evaluation results are saved in either \code{metricsValThr.csv} of \code{metricsTestThr.csv} files, depending on threshold used for binarization.
-Optionally, \code{.npy} format per scene results can be saved, together with \code{.png} format masks for visual evaluation by the human observer.
+As a final step, the prediction masks are binarized and metrics are computed using \code{computeMetrics} function.
+Results are saved to \code{metricsValThr.csv} or \code{metricsTestThr.csv}, depending on the thresholding variant.
+Optionally, per-scene \code{.npy} results can be saved alongside \code{.png} masks for visual inspection.
 
-\vfill
-
-This process concludes the Implementation chapter and therefore finalizes the software development within the scope of this work.
+This process concludes the \emph{Implementation} chapter and finalizes the software development conducted within the scope of this work.
 
 }

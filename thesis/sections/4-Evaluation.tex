@@ -6,78 +6,74 @@
 \chapter{Evaluation}
 \label{chapter:evaluation}
 
-An implemented flexible pipeline gives the opportunity to conveniently train, convert and deploy various different model configurations for \gls{devboard}.
-It enables fast switching between model's architecture, training and deployment configurations, for instance:
-utilizing different number of input channels, changing the spatial resolution of input tensor, utilizing different training, validation, and testing subsets.
-Tailoring these configurations to user needs requires only minor changes to pipeline code.
+A flexible pipeline enables convenient training, conversion, and deployment of diverse model configurations for the \gls{devboard}.
+It supports fast switching between model architecture, training, and deployment settings --- for example, changing the number of input channels,
+the spatial resolution of the input tensor, or the composition of the training/validation/testing subsets.
+Tailoring these configurations to user needs requires only minor code changes.
 
-During the development process, numerous model architectures were designed and trained. Most of them served as prototypes for the debugging process.
-For instance, the model \code{simple} yielded the first inference results, that are presented in \secshortref{sec:deployment}.
-After successful implementation phase, five models were selected for the evaluation process. These models were trained for an appropriate number of epochs,
-their inference time performance was checked on \gls{devboard} and evaluation metrics gathered utilizing evaluation pipeline. 
-One of these model was the first to yield qualitatively high results.
-It hosts a simplified and adjusted for edge inference \code{Cloud-Net} architecture\cite{CloudNet2019}.
-The first model's architecture will be called \code{earlyCloudEdgeQ} in the scope of this work.
-The remaining four models are all of the exact same architecture, which is an improved version of \code{earlyCloudEdgeQ}.
-Architecture of these models is therefore called \code{improvedCloudEdgeQ}.
-But these models are utilizing different number of input channels (\gls{rgb} with \gls{nir} or only \gls{rgb}),
-and they furthermore are using different input patch size (either \ensuremath{192\times192} or \ensuremath{384\times384}).
-It has to be mentioned, that all five of these models follow classical \code{uNet} structure,
-outlined in \secshortref{subsec:stateoftheart}. They contain encoder, bottleneck and decoder,
-as well as the skip-connections between corresponding encoder and decoder blocks.
+During development, numerous model architectures were designed and trained, most serving as prototypes for debugging.
+For instance, the \code{simple} model produced the first inference results (see \secshortref{sec:deployment}).
+After the implementation phase, five models were selected for evaluation.
+These were trained for an appropriate number of epochs, their inference time measured on the \gls{devboard}, and their metrics computed via the evaluation pipeline.
+One of these models was the first one to yield qualitatively high results: a simplified, edge adapted \code{Cloud-Net} architecture \cite{CloudNet2019},
+referred to here as \code{earlyCloudEdgeQ}.
+The remaining four models share an improved, identical architecture \code{improvedCloudEdgeQ},
+and differ only in (i) input channels (\gls{rgb}+\gls{nir} vs. \gls{rgb}) and (ii) input patch size (\(192\times192\) vs. \(384\times384\)).
 
+Note that all five models follow the classical \code{U-Net} structure (see \secshortref{subsec:stateoftheart}), comprising an encoder,
+bottleneck, and decoder, with skip connections between corresponding encoder and decoder blocks.
 
-Below the detailed description of both architectures is presented:
-\begin{itemize}
+Detailed descriptions of both architectures follow:
+
+\begin{itemize}[itemsep=0.5\baselineskip]
     \item \textbf{earlyCloudEdgeQ}: The model hosts three encoder blocks, a bottleneck block, and three decoder blocks.
     Each encoder block consists of two \code{Conv2D} layers and one \code{MaxPooling2D} layer,
-    connected sequentionally one after another. Bottleneck consists of two sequentionally connected \code{Conv2D} layers.
-    Each decoder block is represented by \code{Conv2DTranspose} layer, \code{Concatenate} layer, and two \code{Conv2D} layers,
-    connected sequentionally. An output layer is represented by a \code{Conv2D} layer.
-    Base number of filter is specified as 32 and is doubled/halved in each encoder/decoder block respectively, resulting in 256 filters in the bottleneck.
-    \gls{bn} is applied accordingly after each \code{Conv2D} layer, but before its activation function. \gls{bn} is not applied in output layer.
-    All suitable \glspl{tfop} are \gls{qat} annotaded. \gls{bce} is used as loss function and \code{adam} \cite{adam} is used as optimizer.
-    \item \textbf{improvedCloudEdgeQ}: This model mimics the previous architecture with the following improvements.
-    Between input and first encoder block a \code{Conv2D} layer with 16 filters is added to improve feature representation at the input stage,
-    enabling the encoder to capture more consistent low-level patterns before deeper processing.
-    Furthermore the model hosts now four encoder blocks, a bottleneck block, and four decoder blocks. The bottleneck design was adapted from \code{Cloud-Net},
-    where a residual connection with a $1\times1$ projection ensures feature dimension alignment and efficient gradient flow. Additionally,
-    the integration of dropout regularization reduces overfitting, resulting in a more robust and generalizable feature representation at the network's deepest layer.
-    These ideas are copied from \code{Cloud-Net} architecture.
-    To meet the limited \gls{edgetpu} static \gls{ram} capacity, the decoder blocks were simplified by removing one \code{Conv2D} layer from each block,
-    except for the final decoder block before the output layer, which retains two \code{Conv2D} layers to preserve finer spatial resolution.
-    Additionally, using \gls{bce} combined with \ensuremath{0.5 \cdot DiceLoss} as the loss function balances pixel-wise accuracy with overlap-based region matching,
-    leading to better segmentation performance than plain \gls{bce} \cite{bcedice1, bcedice2}.
+    connected sequentially. The bottleneck consists of two sequential \code{Conv2D} layers.
+    Each decoder block contains a \code{Conv2DTranspose} layer, a \code{Concatenate} layer, and two \code{Conv2D} layers,
+    connected sequentially. The output layer is a \code{Conv2D} layer.
+    The base number of filters is 32 and is doubled in each encoder block and halved in each decoder block,
+    resulting in 256 filters at the bottleneck.
+    \gls{bn} is applied after each \code{Conv2D} layer and before its activation; it is not applied in the output layer.
+    All suitable \glspl{tfop} are \gls{qat}-annotated. \gls{bce} is used as the loss function and \code{Adam} \cite{adam} as the optimizer.
 
+    \item \textbf{improvedCloudEdgeQ}: This model follows the previous architecture with the following refinements.
+    Between the input and the first encoder block, a \code{Conv2D} layer with 16 filters is inserted to improve feature representation at the input stage,
+    enabling the encoder to capture more consistent low-level patterns before deeper processing.
+    The model comprises four encoder blocks, a bottleneck, and four decoder blocks.
+    The bottleneck design is adapted from \code{Cloud-Net}, where a residual connection with a \(1\times1\) projection ensures feature-dimension alignment and efficient gradient flow.
+    Dropout regularization is added to reduce overfitting and improve robustness at the network's deepest layer.
+    To meet the \gls{edgetpu}'s limited on-chip static \gls{ram} capacity, the decoder blocks were simplified by removing one \code{Conv2D} layer from each block,
+    except for the final decoder block before the output layer, which retains two \code{Conv2D} layers to preserve finer spatial detail.
+    Additionally, using \gls{bce} combined with \(\,0.5 \cdot \text{DiceLoss}\,\) as the loss function balances pixel-wise accuracy with overlap-based region matching,
+    leading to better segmentation performance than plain \gls{bce} \cite{bcedice1, bcedice2}.
 \end{itemize}
 
-\code{improvedCloudEdgeQ} architecture can be summarized as an adjusted \code{Cloud-Net} model to meet the contraints of embedded \gls{edgetpu} development.
-Necessary simplifications were made. Both \code{earlyCloudEdgeQ} and \code{improvedCloudEdgeQ} architectures can be investigated more detailed in the
-\code{model.py} file,
-as well as compared with \code{Cloud-Net} model
-architecture\footnote{\url{https://github.com/SorourMo/Cloud-Net-A-semantic-segmentation-CNN-for-cloud-detection/blob/master/Cloud-Net/cloud_net_model.py}}.
+\code{improvedCloudEdgeQ} can be summarized as an adjusted \code{Cloud-Net} model tailored to the constraints of embedded \gls{edgetpu} development.
+Necessary simplifications were made.
+Both \code{earlyCloudEdgeQ} and \code{improvedCloudEdgeQ} can be examined in more detail in \code{model.py} and compared with the original \code{Cloud-Net} model
+architecture.\footnote{\url{https://github.com/SorourMo/Cloud-Net-A-semantic-segmentation-CNN-for-cloud-detection/blob/master/Cloud-Net/cloud_net_model.py}}
 
-Following table further specifies the differencec between the models, providing information about number of input channels (CH),
-size of an input patch (In size), number of training epochs (Epochs), estimated count of arithmetic operations in billions (Ops (B)),
-On-chip/Off-chip memory used for caching model parameters (On-chip (MB)/Off-chip (KB)),
-inference time needed by \gls{devboard} to process one batch in milliseconds (Inf. Time (ms)).
+The following table details the differences between the models, reporting the number of input channels (CH),
+input-patch size (In size), number of trainable parameters in millions (Params (M)), number of training epochs (Epochs),
+estimated arithmetic operations in billions (Ops (B)), on-chip/off-chip memory used to cache model parameters (On-chip (MB) / Off-chip (KB)),
+and the per-batch inference time on the \gls{devboard} (Inf. Time (ms)).
 
 \begin{table}[h!]
 \centering
-\caption{Comparison of model properties and deployment metrics}
 \label{tab:model_comparison}
 \renewcommand{\arraystretch}{1.3}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{|l|c|c|c|c|c|c|c|}
+\begin{tabular}{|l|c|c|c|c|c|c|c|c|}
 \hline
-\textbf{Model} & \textbf{CH} & \textbf{In size} & \textbf{Epochs} & \textbf{Ops (B)} & \textbf{On-chip (MB)} & \textbf{Off-chip (KB)} & \textbf{Inf. Time (ms)} \\ \hline
-early      & 4 & 192 & 100  & 10.4 & 1.9 & 46  & 15.2 \\ \hline
-improved~1 & 3 & 192 & 54   & 11.6 & 5.7 & 342 & 20.5 \\ \hline
-improved~2 & 3 & 384 & 46   & 46.3 & 6.0 & 349 & 12.7 \\ \hline
-improved~3 & 4 & 192 & 51   & 11.6 & 5.7 & 342 & 10.3 \\ \hline
-improved~4 & 4 & 384 & 45   & 46.4 & 6.0 & 349 & 25.8 \\ \hline
+\textbf{Model} & \textbf{CH} & \textbf{In size} & \textbf{Params (M)} & \textbf{Epochs} & \textbf{Ops (B)} & \textbf{On-chip (MB)} & \textbf{Off-chip (KB)} & \textbf{Inf. Time (ms)} \\ \hline
+early      & 4 & 192 & 1.9 & 100  & 10.4 & 1.9 & 46  & 15.2 \\ \hline
+improved~1 & 3 & 192 & 6.0 & 54   & 11.6 & 5.7 & 342 & 20.5 \\ \hline
+improved~2 & 3 & 384 & 6.0 & 46   & 46.3 & 6.0 & 349 & 12.7 \\ \hline
+improved~3 & 4 & 192 & 6.0 & 51   & 11.6 & 5.7 & 342 & 10.3 \\ \hline
+improved~4 & 4 & 384 & 6.0 & 45   & 46.4 & 6.0 & 349 & 25.8 \\ \hline
 \end{tabular}%
 }
+\caption{Comparison of model properties and deployment metrics}
 \end{table}
 
 \todo{inference time coral and add learnable params!}
