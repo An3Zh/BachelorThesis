@@ -1,3 +1,5 @@
+Welcome to my Bachelor's Thesis Project.
+
 The files and folders are referenced in my Bachelor's thesis by their exact names.
 
 The full 38-Cloud dataset can be downloaded here: https://www.kaggle.com/datasets/sorour/38cloud-cloud-segmentation-in-satellite-images
@@ -5,6 +7,8 @@ The full 38-Cloud dataset can be downloaded here: https://www.kaggle.com/dataset
 For any questions regarding the implementation or reproducibility of this project, feel free to contact me at
 
 zharski@campus.tu-berlin.de
+
+This README is still under construction :) ...
 
 ## 🧟‍♂️ Git Horror Stories Zone
 
