@@ -1,14 +1,40 @@
-Welcome to my Bachelor's Thesis Project.
+# Bachelor's Thesis Project
 
-The files and folders are referenced in my Bachelor's thesis by their exact names.
+Welcome to my Bachelor's Thesis Project.  
+You can find the thesis text in [`Abschlussarbeit_458692.pdf`](./Abschlussarbeit_458692.pdf).
 
-The full 38-Cloud dataset can be downloaded here: https://www.kaggle.com/datasets/sorour/38cloud-cloud-segmentation-in-satellite-images
+---
 
-For any questions regarding the implementation or reproducibility of this project, feel free to contact me at
+## Branch Overview
+- `main` — LaTeX source for the written thesis.  
+- `sync`, `nonir`, `nonir-improved` — implemented pipelines (with/without NIR channel).  
+- `coral` — Google Coral Dev Board Mini inference software (C++ with TF Lite API).  
 
+See my thesis for further details on Coral setup.
+
+---
+
+## Pipelines Setup Instructions
+
+1. **Download the dataset**  
+   Get the [38-Cloud dataset](https://www.kaggle.com/datasets/sorour/38cloud-cloud-segmentation-in-satellite-images).
+
+2. **Install dependencies**  
+   ```bash
+   pip install -r requirements.txt
+
+3. **Adjust paths via config.json. Example:** 
+```bash
+{
+  "baseDir": "C:/Users/andre/Documents/BA/dev/pipeline/Data",
+  "csvTrainVal": "C:/Users/andre/Documents/BA/dev/pipeline/Data/training_patches_38-cloud_nonempty.csv",
+  "csvTest": "C:/Users/andre/Documents/BA/dev/pipeline/Data/!myCSVs/fullTestDS.csv"
+}
+```
+
+## Contact
+For questions on implementation or reproducibility, feel free to reach out:
 zharski@campus.tu-berlin.de
-
-This README is still under construction :) ...
 
 ## 🧟‍♂️ Git Horror Stories Zone
 

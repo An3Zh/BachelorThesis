@@ -53,4 +53,6 @@ edgetpu_results
 scripts
 testdata
 thesis/files
-
+!Abschlussarbeit_458692.pdf
+!/requirements.txt
+*.code-workspace
